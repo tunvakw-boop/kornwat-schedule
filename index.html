@@ -59,9 +59,8 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .nc{position:sticky;left:0;z-index:3;background:#fde8d8;min-width:110px;max-width:110px;text-align:left!important;padding:4px 6px!important;border-right:2px solid #d99672!important;font-size:11px;font-weight:700;color:#8b4513;}
 .nc-body{position:sticky;left:0;z-index:2;background:#fffdf5;min-width:110px;max-width:110px;text-align:left!important;padding:4px 6px!important;border-right:2px solid #d99672!important;}
 
-/* Header rows — uniform */
+/* Header rows — uniform (no weekend special bg) */
 .hdr1 th,.hdr2 th{background:#fde8d8;color:#8b4513;font-size:11px;font-weight:700;height:26px;font-family:'Sarabun',sans-serif;}
-.hdr1 th.wknd,.hdr2 th.wknd{background:#fce4ec;color:#c2185b;}
 .hdr2 th{font-size:10px;height:22px;font-weight:600;}
 .sub-hd{background:#fde8d8;color:#8b4513;font-size:11px;font-weight:700;padding:2px 4px!important;line-height:1.15;}
 .sub-hd-sm{font-size:10px;font-weight:600;}
@@ -72,7 +71,6 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .dc.W{background:#d5edd8;}
 .dc.OFF{background:#e74c3c;color:#fff;font-weight:800;}
 .dc.HALF{background:#fef3c0;color:#d97706;font-weight:700;}
-.dc.wknd.W{background:#cce8d0;}
 .dc.pub-h{position:relative;}
 .dc.pub-h::after{content:'★';position:absolute;top:0;right:1px;font-size:7px;color:#ff6f00;line-height:1.2;}
 
@@ -370,6 +368,7 @@ async function init(){
   const saved = localStorage.getItem(LSK);
   data = saved ? (()=>{try{return JSON.parse(saved);}catch{return clone(EXCEL);}})() : clone(EXCEL);
   ensurePositionField(data);
+  migrateToHolidayModel(data);
   // Load meta (lastSavedAt + dirty flag)
   try{
     const meta = JSON.parse(localStorage.getItem(LSK_META)||'{}');
@@ -449,6 +448,68 @@ function ensurePositionField(d){
   });
 }
 
+// Migrate to new model:
+//   - m.holidaysAdded (number) = how many extra holidays added this month
+//   - emp.phCarry (number) = carryover from previous month, frozen at month creation
+//   - For type=regular: phTotal/phRemain/vacUsed are DERIVED (not stored)
+function migrateToHolidayModel(d){
+  Object.values(d).forEach(m=>{
+    if(m.holidaysAdded === undefined){
+      m.holidaysAdded = (m.publicHolidays||[]).length;
+    }
+    (m.employees||[]).forEach(e=>{
+      if(e.phCarry === undefined){
+        const stored = parseFloat(e.phTotal||0)||0;
+        e.phCarry = Math.max(0, stored - (m.holidaysAdded||0));
+      }
+    });
+  });
+}
+
+// Count days of a specific weekday (0=Sun..6=Sat) in a month
+function countWeekdayInMonth(year, month, weekday){
+  const days = new Date(year, month, 0).getDate();
+  let count=0;
+  for(let d=1; d<=days; d++){
+    if(new Date(year, month-1, d).getDay()===weekday) count++;
+  }
+  return count;
+}
+
+// Derive employee stats. Regulars: auto-calc. Others: use stored values.
+function deriveEmpStats(emp, m){
+  let off=0, half=0, wk=0;
+  for(let d=1; d<=m.days; d++){
+    const s = (emp.schedule&&emp.schedule[d])||'W';
+    if(s==='W') wk++;
+    else if(s==='OFF') off++;
+    else if(s==='HALF'){ half++; wk+=0.5; }
+  }
+  const actualOff = off + half*0.5;
+  const tueCount = countWeekdayInMonth(m.year, m.month, 2);
+
+  if(emp.type==='regular'){
+    const holidaysAdded = parseFloat(m.holidaysAdded||0)||0;
+    const phCarry = parseFloat(emp.phCarry||0)||0;
+    const phTotal = phCarry + holidaysAdded;
+    const vacUsed = Math.max(0, actualOff - tueCount);
+    const phRemain = phTotal - vacUsed;
+    return {wk, off, half, actualOff, tueCount, holidaysAdded, phCarry,
+            phTotal, phRemain, vacUsed, auto:true};
+  }
+  // Non-regular: keep stored values
+  return {wk, off, half, actualOff, tueCount,
+          phTotal: emp.phTotal||'', phRemain: emp.phRemain||'',
+          vacUsed: emp.vacUsed||'', auto:false};
+}
+
+function fmtNum(n){
+  if(n===''||n==null) return '';
+  if(typeof n==='string') return n;
+  // strip trailing .0
+  return String(+(+n).toFixed(2));
+}
+
 async function syncFromCloud(){
   setSync('syncing');
   try{
@@ -464,6 +525,7 @@ async function syncFromCloud(){
       const cloudData = {};
       rows.forEach(r => cloudData[r.key] = r.data);
       ensurePositionField(cloudData);
+      migrateToHolidayModel(cloudData);
       data = cloudData;
       saveLocal();
       const ks = sorted();
@@ -543,8 +605,7 @@ function renderSchedule(){
     <th class="nc" style="min-width:30px;max-width:30px;text-align:center!important;">No.</th>
     <th class="nc" style="min-width:108px;max-width:108px;">Name</th>`;
   for(let d=1;d<=m.days;d++){
-    const w=dow(m.year,m.month,d), wk=w===0||w===6;
-    h1+=`<th class="${wk?'wknd':''}" style="min-width:26px;width:26px;">${d}</th>`;
+    h1+=`<th style="min-width:26px;width:26px;">${d}</th>`;
   }
   h1+=`<th class="sub-hd" colspan="2">Day type</th>
        <th class="sub-hd">ใช้วันหยุด</th>
@@ -555,8 +616,8 @@ function renderSchedule(){
     <th class="nc" style="min-width:30px;max-width:30px;"></th>
     <th class="nc" style="min-width:108px;max-width:108px;font-size:10px;">Day type</th>`;
   for(let d=1;d<=m.days;d++){
-    const w=dow(m.year,m.month,d), wk=w===0||w===6;
-    h2+=`<th class="${wk?'wknd':''}">${DAY_TH[w]}</th>`;
+    const w=dow(m.year,m.month,d);
+    h2+=`<th>${DAY_TH[w]}</th>`;
   }
   h2+=`<th class="sub-hd sub-hd-sm">work</th>
        <th class="sub-hd sub-hd-sm">Day off</th>
@@ -575,23 +636,20 @@ function renderSchedule(){
       return;
     }
     autoNo++;
-    let wk=0,of=0;
     let cells='';
     for(let d=1;d<=m.days;d++){
       const s=(emp.schedule&&emp.schedule[d])||'W';
-      const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
-      if(s==='W') wk++; else if(s==='OFF') of++; else if(s==='HALF') wk+=.5;
+      const isPH=ph.has(d);
       const lbl = s==='OFF'?'OFF': s==='HALF'?'½':'';
-      cells+=`<td class="dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}" onclick="tap(${ei},${d})">${lbl}</td>`;
+      cells+=`<td class="dc ${s}${isPH?' pub-h':''}" onclick="tap(${ei},${d})">${lbl}</td>`;
     }
     const pos = emp.position||'';
-    // Auto-compute phRemain from phTotal - vacUsed if both numeric
-    const phT = emp.phTotal||'';
-    const vU = emp.vacUsed||'';
-    let phR = emp.phRemain||'';
-    const phTn = parseFloat(phT), vUn = parseFloat(vU);
-    if(!isNaN(phTn) && !isNaN(vUn)) phR = String(+(phTn - vUn).toFixed(2));
-    else if(!isNaN(phTn) && !vU) phR = String(phTn);
+    const st = deriveEmpStats(emp, m);
+    const phTotalDisp = st.auto ? fmtNum(st.phTotal) : (st.phTotal||'');
+    const phRemainDisp = st.auto ? fmtNum(st.phRemain) : (st.phRemain||'');
+    const vacUsedDisp = st.auto ? fmtNum(st.vacUsed) : (st.vacUsed||'');
+    const phEditHandler = st.auto ? `editPhCarry(${ei})` : `editPhTotal(${ei})`;
+    const vacEditHandler = st.auto ? `showAutoCalcInfo(${ei})` : `editVacUsed(${ei})`;
     body+=`<tr class="emp-row" data-ei="${ei}">
       <td class="nc-body emp-no-cell" style="min-width:30px;max-width:30px;">${autoNo}</td>
       <td class="nc-body" style="min-width:108px;max-width:108px;" onclick="editEmpName(${ei})">
@@ -599,11 +657,11 @@ function renderSchedule(){
         ${pos?`<span class="emp-pos">${esc(pos)}</span>`:''}
       </td>
       ${cells}
-      <td class="sc wk" id="wk-${ei}">${wk}</td>
-      <td class="sc of" id="of-${ei}">${of}</td>
-      <td class="sc vc" id="vc-${ei}" onclick="editVacUsed(${ei})" title="แตะเพื่อแก้ไข">${esc(vU)||'<span style="color:#ccc;">—</span>'}</td>
-      <td class="sc ph" id="pht-${ei}" onclick="editPhTotal(${ei})" title="แตะเพื่อแก้ไข">${esc(phT)||'<span style="color:#ccc;">—</span>'}</td>
-      <td class="sc ph" id="phr-${ei}">${esc(phR)}</td>
+      <td class="sc wk" id="wk-${ei}">${fmtNum(st.wk)}</td>
+      <td class="sc of" id="of-${ei}">${st.off}</td>
+      <td class="sc vc" id="vc-${ei}" onclick="${vacEditHandler}" title="${st.auto?'คำนวณอัตโนมัติ — แตะเพื่อดูรายละเอียด':'แตะเพื่อแก้ไข'}">${vacUsedDisp||'<span style="color:#ccc;">—</span>'}</td>
+      <td class="sc ph" id="pht-${ei}" onclick="${phEditHandler}" title="${st.auto?'แตะเพื่อแก้ไข ที่มี (carryover)':'แตะเพื่อแก้ไข'}">${phTotalDisp||'<span style="color:#ccc;">—</span>'}</td>
+      <td class="sc ph" id="phr-${ei}">${phRemainDisp||'<span style="color:#ccc;">—</span>'}</td>
       <td class="rc" onclick="editRemark(${ei})" title="แตะเพื่อแก้ไข">${esc(emp.remark||'')||'<span style="color:#ccc;">—</span>'}</td>
     </tr>`;
   });
@@ -616,21 +674,26 @@ function renderSchedule(){
     const g=grps[d]||'';
     grpCells+=`<td class="grp-cell${g?' has-grp':''}" onclick="editGroup(${d})"><span class="grp-txt">${esc(g)}</span></td>`;
   }
-  const regs=m.employees.filter(e=>e.name&&e.type==='regular');
-  let avgWk='',avgOf='';
-  if(regs.length){
-    let tw=0,to=0;
-    regs.forEach(e=>{let w=0,o=0;for(let d=1;d<=m.days;d++){const s=(e.schedule&&e.schedule[d])||'W';if(s==='W')w++;else if(s==='OFF')o++;else if(s==='HALF')w+=.5;}tw+=w;to+=o;});
-    avgWk=Math.round(tw/regs.length); avgOf=Math.round(to/regs.length);
-  }
-  document.getElementById('tbl-foot').innerHTML=`<tr class="grp-row">
+
+  // Dynamic group row height — fit longest group name (rotated text reads bottom-to-top)
+  // visual height of rotated text ≈ chars * ~9px (Thai @ 10px font)
+  const grpNames = Object.values(grps).filter(v=>v);
+  const maxChars = grpNames.length ? Math.max(...grpNames.map(n=>String(n).length)) : 0;
+  const grpRowH = Math.max(60, Math.min(180, maxChars * 9 + 18));
+
+  // Footer fixed values: Tuesday count = nominal day off; work = days - tueCount
+  const tueCount = countWeekdayInMonth(m.year, m.month, 2);
+  const workCount = m.days - tueCount;
+  const holidaysAdded = parseFloat(m.holidaysAdded||0)||0;
+
+  document.getElementById('tbl-foot').innerHTML=`<tr class="grp-row" style="height:${grpRowH}px;">
     <td class="nc-body" style="min-width:30px;max-width:30px;background:#fde8d8;"></td>
     <td class="nc-body" style="min-width:108px;max-width:108px;background:#fde8d8;color:#8b4513;font-weight:700;font-size:11px;">ชื่อ กรุ๊ป</td>
     ${grpCells}
-    <td class="sc wk" style="background:#fef3e2;writing-mode:initial;">${avgWk}</td>
-    <td class="sc of" style="background:#fef3e2;writing-mode:initial;">${avgOf}</td>
-    <td colspan="3" style="background:#fef3e2;font-size:10px;color:#8b4513;text-align:left;padding:3px 5px;cursor:pointer;" onclick="showEditHolidayModal()" title="แตะเพื่อแก้ไขวันหยุด/หมายเหตุ">${esc(m.note||'<span style="color:#aaa;">— แตะเพื่อใส่วันหยุด/หมายเหตุ —</span>')}</td>
-    <td class="rc" style="background:#fef3e2;font-size:10px;color:#d97706;font-weight:700;cursor:pointer;" onclick="showEditHolidayModal()">วันหยุดเพิ่ม ⚙</td>
+    <td class="sc wk" style="background:#fef3e2;writing-mode:initial;" title="วันทำงาน = วันในเดือน − จำนวนวันอังคาร">${workCount}</td>
+    <td class="sc of" style="background:#fef3e2;writing-mode:initial;" title="จำนวนวันอังคารในเดือน (วันหยุดประจำสัปดาห์)">${tueCount}</td>
+    <td colspan="3" style="background:#fef3e2;font-size:10px;color:#8b4513;text-align:left;padding:3px 5px;cursor:pointer;" onclick="showEditHolidayModal()" title="แตะเพื่อแก้ไขหมายเหตุ/วันหยุดบนปฏิทิน">${esc(m.note||'')||'<span style="color:#aaa;">— แตะเพื่อใส่หมายเหตุ —</span>'}</td>
+    <td class="rc" style="background:#fef3e2;font-size:11px;color:#d97706;font-weight:800;cursor:pointer;text-align:center;" onclick="editHolidaysAdded()" title="แตะเพื่อใส่จำนวนวันหยุดนักขัตฤกษ์เดือนนี้">+${holidaysAdded} ⚙</td>
   </tr>`;
   // Also make the top note-bar clickable
   const nb = document.getElementById('note-bar');
@@ -647,10 +710,10 @@ function tap(ei,d){
   saveLocal(); markDirty();
   const ph=new Set(m.publicHolidays||[]);
   const s=emp.schedule[d];
-  const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
+  const isPH=ph.has(d);
   const cell=document.querySelector(`tr[data-ei="${ei}"] td.dc[onclick="tap(${ei},${d})"]`);
   if(cell){
-    cell.className=`dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}`;
+    cell.className=`dc ${s}${isPH?' pub-h':''}`;
     cell.textContent=s==='OFF'?'OFF':s==='HALF'?'½':'';
   }
   updateRowTotals(ei);
@@ -658,14 +721,19 @@ function tap(ei,d){
 
 function updateRowTotals(ei){
   const m=data[curKey]; const emp=m.employees[ei]; if(!emp) return;
-  let wk=0,of=0;
-  for(let d=1;d<=m.days;d++){
-    const s=(emp.schedule&&emp.schedule[d])||'W';
-    if(s==='W')wk++;else if(s==='OFF')of++;else if(s==='HALF')wk+=.5;
+  const st = deriveEmpStats(emp, m);
+  const wEl=document.getElementById(`wk-${ei}`);
+  const oEl=document.getElementById(`of-${ei}`);
+  const vEl=document.getElementById(`vc-${ei}`);
+  const ptEl=document.getElementById(`pht-${ei}`);
+  const prEl=document.getElementById(`phr-${ei}`);
+  if(wEl) wEl.textContent = fmtNum(st.wk);
+  if(oEl) oEl.textContent = st.off;
+  if(st.auto){
+    if(vEl) vEl.textContent = fmtNum(st.vacUsed);
+    if(ptEl) ptEl.textContent = fmtNum(st.phTotal);
+    if(prEl) prEl.textContent = fmtNum(st.phRemain);
   }
-  const wEl=document.getElementById(`wk-${ei}`), oEl=document.getElementById(`of-${ei}`);
-  if(wEl) wEl.textContent=wk;
-  if(oEl) oEl.textContent=of;
 }
 
 function editEmpName(ei){
@@ -727,6 +795,75 @@ function editRemark(ei){
 function saveRemark(ei){
   data[curKey].employees[ei].remark=document.getElementById('rem-inp').value.trim();
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── Holidays added (วันหยุดเพิ่ม) editor — sets m.holidaysAdded ──
+function editHolidaysAdded(){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const m=data[curKey]; if(!m) return;
+  const phInfo = lookupThaiHolidays(m.year, m.month);
+  const suggested = phInfo.days.filter(d=>d>=1 && d<=m.days);
+  openModal(`วันหยุดเพิ่ม — ${m.label}`,
+    `<div class="fg"><label>จำนวนวันหยุดนักขัตฤกษ์เดือนนี้</label>
+       <input type="number" id="ha-inp" value="${m.holidaysAdded||0}" min="0" max="15" step="1" style="font-size:18px;font-weight:700;text-align:center;"></div>
+     <p style="font-size:11px;color:#666;margin-top:-4px;margin-bottom:11px;">จำนวนนี้จะถูกบวกเข้าช่อง <strong>ที่มี</strong> ของพนักงานประจำทุกคน (carryover + จำนวนนี้)</p>
+     ${suggested.length?`<div style="background:#fef3e2;padding:8px 10px;border-radius:6px;margin-bottom:11px;font-size:11px;color:#8b4513;">
+       💡 ปฏิทินไทย: <strong>${suggested.length}</strong> วัน (${suggested.join(', ')})<br>
+       <em style="color:#666;">${esc(phInfo.note)}</em><br>
+       <button type="button" onclick="document.getElementById('ha-inp').value=${suggested.length};" style="margin-top:6px;background:#e07b54;color:#fff;border:none;border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;">↻ ใช้ค่านี้ (${suggested.length})</button>
+     </div>`:'<p style="font-size:10px;color:#aaa;margin-bottom:11px;">เดือนนี้ไม่มีวันหยุดในปฏิทินไทย</p>'}`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveHolidaysAdded()">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('ha-inp').focus(),100);
+}
+function saveHolidaysAdded(){
+  const v = document.getElementById('ha-inp').value;
+  const n = Math.max(0, parseInt(v)||0);
+  data[curKey].holidaysAdded = n;
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── PhCarry editor (carryover from previous month) — only for regular employees ──
+function editPhCarry(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  const m = data[curKey];
+  const holidaysAdded = parseFloat(m.holidaysAdded||0)||0;
+  const phCarry = parseFloat(emp.phCarry||0)||0;
+  openModal('ที่มี (วันหยุด) — '+emp.name,
+    `<div class="fg"><label>Carryover จากเดือนก่อน (วัน)</label>
+       <input type="number" id="pc-inp" value="${phCarry}" min="0" max="60" step="0.5"></div>
+     <p style="font-size:11px;color:#666;margin-top:-4px;">
+       ที่มีรวม = <strong>${phCarry}</strong> + <strong>${holidaysAdded}</strong> (วันหยุดเพิ่มเดือนนี้) = <strong>${phCarry+holidaysAdded}</strong>
+     </p>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="savePhCarry(${ei})">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('pc-inp').focus(),100);
+}
+function savePhCarry(ei){
+  const v = document.getElementById('pc-inp').value;
+  data[curKey].employees[ei].phCarry = Math.max(0, parseFloat(v)||0);
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── Read-only info popup for auto-calculated ใช้วันหยุด ──
+function showAutoCalcInfo(ei){
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  const m = data[curKey];
+  const st = deriveEmpStats(emp, m);
+  openModal('ใช้วันหยุด — '+emp.name+' (อัตโนมัติ)',
+    `<div style="font-size:13px;line-height:1.7;color:#333;">
+       <p><strong>วันอังคารในเดือน:</strong> ${st.tueCount} วัน (วันหยุดประจำสัปดาห์)</p>
+       <p><strong>OFF จริง:</strong> ${st.off} วัน${st.half?` + ${st.half} ครึ่ง = ${fmtNum(st.actualOff)} วัน`:''}</p>
+       <p style="margin-top:8px;padding:8px;background:#fff3e0;border-radius:5px;">
+         <strong style="color:#c44a1f;">ใช้วันหยุด = max(0, ${fmtNum(st.actualOff)} − ${st.tueCount}) = ${fmtNum(st.vacUsed)} วัน</strong>
+       </p>
+       <p style="margin-top:8px;padding:8px;background:#e8f5e9;border-radius:5px;">
+         <strong style="color:#2e7d32;">คงเหลือ = ${fmtNum(st.phTotal)} − ${fmtNum(st.vacUsed)} = ${fmtNum(st.phRemain)} วัน</strong>
+       </p>
+       <p style="margin-top:8px;font-size:11px;color:#666;">ค่านี้คำนวณอัตโนมัติจากตาราง OFF — แก้ไม่ได้โดยตรง แก้โดยปรับ OFF ในตารางหรือปรับ ที่มี (carryover)</p>
+     </div>`,
+    `<button class="btn-pri" onclick="closeModal()">เข้าใจแล้ว</button>`);
 }
 
 // ── Vacation used (ใช้วันหยุด) editor — auto-recalcs phRemain ──
@@ -800,31 +937,24 @@ function addNextMonth(){
   if(data[key]){ showToast('มีเดือนนี้แล้ว'); curKey=key; render(); return; }
   const days=new Date(y,mo,0).getDate();
 
-  // Auto-load Thai holidays for this month
-  const phInfo = lookupThaiHolidays(y, mo);
-  const ph = phInfo.days.filter(d=>d>=1 && d<=days);
-  const phCount = ph.length;
-
-  // Carry over employees; regular employees accrue phCount new ph days
-  const emps = (last && data[last].employees||[]).filter(e=>e.name).map(e=>{
+  // Carry over employees — only phCarry (from prev month's derived phRemain for regulars)
+  const lastMonth = last ? data[last] : null;
+  const emps = (lastMonth && lastMonth.employees||[]).filter(e=>e.name).map(e=>{
     const s={}; for(let d=1;d<=days;d++) s[d]='W';
-    let phTotal='', phRemain='';
-    if(e.type==='regular'){
-      const prevRemain = parseFloat(e.phRemain) || 0;
-      const tot = prevRemain + phCount;
-      phTotal = String(tot);
-      phRemain = String(tot); // not used yet this month
+    let phCarry = 0;
+    if(e.type==='regular' && lastMonth){
+      const prevStats = deriveEmpStats(e, lastMonth);
+      phCarry = parseFloat(prevStats.phRemain)||0;
     }
-    return {no:e.no||'',name:e.name,position:e.position||'',type:e.type,schedule:s,vacUsed:'',phTotal,phRemain,remark:''};
+    return {no:e.no||'',name:e.name,position:e.position||'',type:e.type,schedule:s,
+            phCarry, vacUsed:'', phTotal:'', phRemain:'', remark:''};
   });
 
-  const note = phCount
-    ? `เดือน ${MONTH_TH[mo]} หยุด ${phCount} วัน (${ph.join(', ')}) — ${phInfo.note} · วันหยุดเพิ่ม ${phCount} วัน`
-    : `เดือน ${MONTH_TH[mo]} — ไม่มีวันหยุดเพิ่ม`;
-
-  data[key]={label:`${MONTH_TH[mo]} ${y}`,year:y,month:mo,days,note,publicHolidays:ph,groups:{},employees:emps};
+  // New month: no auto-fill of holidays. User adds via footer cell.
+  data[key]={label:`${MONTH_TH[mo]} ${y}`,year:y,month:mo,days,
+             note:'', publicHolidays:[], holidaysAdded:0, groups:{}, employees:emps};
   curKey=key; saveLocal(); markDirty(); render();
-  showToast(`สร้างเดือน ${MONTH_TH[mo]} ${beYear(y)} แล้ว${phCount?` (+${phCount} วันหยุด)`:''}`);
+  showToast(`สร้างเดือน ${MONTH_TH[mo]} ${beYear(y)} แล้ว — กดช่อง "วันหยุดเพิ่ม" เพื่อใส่จำนวนวันหยุด`);
 }
 
 // ═══════════════════ SUMMARY ═══════════════════
@@ -839,20 +969,19 @@ function renderSummary(){
     </tr></thead><tbody>`;
   m.employees.forEach(emp=>{
     if(!emp.name) return;
-    let wk=0,of=0,hf=0;
-    for(let d=1;d<=m.days;d++){
-      const s=(emp.schedule&&emp.schedule[d])||'W';
-      if(s==='W')wk++;else if(s==='OFF')of++;else if(s==='HALF'){wk+=.5;hf++;}
-    }
+    const st = deriveEmpStats(emp, m);
+    const v = st.auto ? fmtNum(st.vacUsed) : (st.vacUsed||'-');
+    const pt = st.auto ? fmtNum(st.phTotal) : (st.phTotal||'-');
+    const pr = st.auto ? fmtNum(st.phRemain) : (st.phRemain||'-');
     html+=`<tr>
       <td><span style="color:#e07b54;font-weight:700;">${esc(emp.name)}</span>${emp.position?`<br><span style="font-size:9px;color:#888;">${esc(emp.position)}</span>`:''}<br>
         <span class="badge ${BADGE_CLS[emp.type]||'b-reg'}">${TYPE_LBL[emp.type]||''}</span></td>
-      <td style="color:#2e7d32;font-weight:700;">${wk}</td>
-      <td style="color:#c0392b;font-weight:700;">${of}</td>
-      <td style="color:#d97706;">${hf||'-'}</td>
-      <td style="color:#1565c0;">${emp.vacUsed||'-'}</td>
-      <td style="color:#6a1b9a;">${emp.phTotal||'-'}</td>
-      <td style="color:#6a1b9a;font-weight:700;">${emp.phRemain||'-'}</td>
+      <td style="color:#2e7d32;font-weight:700;">${fmtNum(st.wk)}</td>
+      <td style="color:#c0392b;font-weight:700;">${st.off}</td>
+      <td style="color:#d97706;">${st.half||'-'}</td>
+      <td style="color:#1565c0;">${v||'-'}</td>
+      <td style="color:#6a1b9a;">${pt||'-'}</td>
+      <td style="color:#6a1b9a;font-weight:700;">${pr||'-'}</td>
     </tr>`;
   });
   html+=`</tbody></table></div>`;
@@ -894,13 +1023,22 @@ function renderManage(){
       <div class="mg-hd"><span>👥 พนักงาน ${m.label}</span>
         <button class="btn-sm btn-add" onclick="showAddEmpModal()">+ เพิ่ม</button></div>
       <div class="mg-body">`;
+    const namedIdx = m.employees.map((e,i)=>e.name?i:-1).filter(i=>i>=0);
     m.employees.forEach((emp,ei)=>{
       if(!emp.name) return;
+      const pos = namedIdx.indexOf(ei);
+      const canUp = pos>0;
+      const canDown = pos<namedIdx.length-1;
       html+=`<div class="mg-item">
-        <div><strong style="font-size:12px;color:#e07b54;">${esc(emp.name)}</strong>
+        <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">
+          <button class="btn-sm btn-edit" style="padding:2px 9px;font-size:13px;line-height:1;${canUp?'':'opacity:.3;pointer-events:none;'}" onclick="moveEmp(${ei},-1)">↑</button>
+          <button class="btn-sm btn-edit" style="padding:2px 9px;font-size:13px;line-height:1;${canDown?'':'opacity:.3;pointer-events:none;'}" onclick="moveEmp(${ei},1)">↓</button>
+        </div>
+        <div style="flex:1;min-width:0;padding:0 8px;">
+          <strong style="font-size:12px;color:#e07b54;">${pos+1}. ${esc(emp.name)}</strong>
           ${emp.position?`<span style="font-size:10px;color:#666;display:block;">${esc(emp.position)}</span>`:''}
           <span class="badge ${BADGE_CLS[emp.type]}" style="font-size:9px;">${TYPE_LBL[emp.type]||''}</span></div>
-        <div style="display:flex;gap:5px;">
+        <div style="display:flex;gap:5px;flex-shrink:0;">
           <button class="btn-sm btn-edit" onclick="editEmpName(${ei})">แก้ไข</button>
           <button class="btn-sm btn-del" onclick="delEmp(${ei})">ลบ</button>
         </div></div>`;
@@ -937,14 +1075,30 @@ async function delMonth(k){
   render(); renderManage(); showToast('ลบแล้ว');
 }
 function delEmp(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
   const e=data[curKey].employees[ei];
   if(!confirm(`ลบ "${e.name}"?`)) return;
   data[curKey].employees.splice(ei,1);
   saveLocal(); markDirty(); render(); renderManage(); showToast('ลบพนักงานแล้ว');
 }
+
+// Move employee up/down — swaps positions of named employees only
+function moveEmp(ei, dir){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const m = data[curKey]; if(!m) return;
+  const arr = m.employees;
+  // Find prev/next NAMED index (skip blank rows)
+  let target = ei + dir;
+  while(target>=0 && target<arr.length && !arr[target].name){
+    target += dir;
+  }
+  if(target<0 || target>=arr.length) return;
+  [arr[ei], arr[target]] = [arr[target], arr[ei]];
+  saveLocal(); markDirty(); render(); renderManage();
+}
 async function resetAll(){
   if(!confirm('รีเซ็ตข้อมูลทั้งหมด? การแก้ไขจะหายไป')) return;
-  data=clone(EXCEL); ensurePositionField(data);
+  data=clone(EXCEL); ensurePositionField(data); migrateToHolidayModel(data);
   saveLocal();
   await pushAllNow();
   render(); renderManage();
@@ -1044,12 +1198,13 @@ async function captureTable(){
   try{
     const canvas = await html2canvas(frame, {
       backgroundColor:'#fffdf5',
-      scale: 1.5,
+      scale: 2.5,
       width: w, height: h,
       windowWidth: Math.max(w + 60, 800),
       windowHeight: Math.max(h + 60, 600),
       useCORS:true, allowTaint:true, logging:false,
       scrollX:0, scrollY:0, x:0, y:0,
+      imageTimeout: 0,
     });
     return canvas;
   }finally{
