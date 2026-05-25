@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ตารางพนักงาน - Kornwat Garden Resort</title>
+<meta name="theme-color" content="#e07b54">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -11,11 +15,26 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:'Sarabun',sans-serif;}
 body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflow:hidden;color:#3d2914;}
 
-/* ── HEADER ── */
-#app-header{background:#e07b54;color:#fff;height:50px;display:flex;align-items:center;padding:0 8px;gap:4px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25);}
-#resort-short{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px;}
-.hd-btn{background:rgba(255,255,255,.22);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* ── HEADER (two rows) ── */
+#app-header{background:#e07b54;color:#fff;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;flex-direction:column;}
+.hd-row{display:flex;align-items:center;gap:6px;padding:0 8px;}
+.hd-row-1{height:34px;}
+.hd-row-2{height:40px;border-top:1px solid rgba(0,0,0,.12);background:rgba(0,0,0,.07);gap:5px;padding:5px 6px;}
+#resort-short{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#sync-dot{width:9px;height:9px;border-radius:50%;background:#4caf50;flex-shrink:0;box-shadow:0 0 4px rgba(76,175,80,.6);}
+#sync-dot.syncing{background:#ff9800;box-shadow:0 0 4px rgba(255,152,0,.6);animation:sync-pulse 1s infinite;}
+#sync-dot.error{background:#f44336;box-shadow:0 0 4px rgba(244,67,54,.6);}
+@keyframes sync-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.hd-btn{background:rgba(255,255,255,.22);border:none;color:#fff;width:34px;height:30px;border-radius:6px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0;font-family:'Sarabun',sans-serif;}
 .hd-btn:active{background:rgba(255,255,255,.45);transform:scale(.92);}
+.hd-btn.locked{background:rgba(0,0,0,.32);}
+.hd-btn.unlocked{background:#fff3c4;color:#5d4037;}
+#btn-save{flex:1;height:30px;background:rgba(255,255,255,.22);border:none;color:#fff;border-radius:6px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;font-weight:700;font-family:'Sarabun',sans-serif;line-height:1;min-width:0;}
+#btn-save:active{transform:scale(.97);}
+#btn-save.dirty{background:#ffc107;color:#3d2914;animation:dirty-pulse 1.6s infinite;}
+#btn-save.dirty #save-info{color:#5d4037;}
+#save-info{font-size:10px;opacity:.85;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@keyframes dirty-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,193,7,.55)}50%{box-shadow:0 0 0 5px rgba(255,193,7,0)}}
 
 /* ── VIEWS ── */
 #main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
@@ -91,8 +110,9 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#8b4513;font-family:'Sarabun',sans-serif;}
 .leg-dot{width:13px;height:13px;border-radius:2px;display:inline-block;border:1px solid #ddd;}
 
-/* ── SUMMARY VIEW ── */
-#summary-view{overflow:auto;padding:10px;}
+/* ── SUMMARY / MANAGE scroll fix ── */
+#summary-view,#manage-view{display:block!important;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 10px 30px;height:100%;}
+#summary-view.hidden,#manage-view.hidden{display:none!important;}
 .sum-card{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15);}
 .sum-card-hd{background:#e07b54;color:#fff;padding:8px 12px;font-size:13px;font-weight:700;}
 .sum-tbl{width:100%;border-collapse:collapse;font-size:11px;}
@@ -104,7 +124,6 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .b-reg{background:#e8f5e9;color:#2e7d32;}.b-pt{background:#e3f2fd;color:#1565c0;}.b-int{background:#fff3e0;color:#e65100;}
 
 /* ── MANAGE VIEW ── */
-#manage-view{overflow:auto;padding:10px;}
 .mg-sec{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .mg-hd{background:#e07b54;color:#fff;padding:9px 12px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
 .mg-body{padding:10px;}
@@ -141,23 +160,32 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 #fab.hidden{display:none;}
 #fab:active{transform:scale(.93);}
 
-/* ── TOAST + SYNC ── */
+/* ── TOAST ── */
 #toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:7px 14px;border-radius:18px;font-size:12px;z-index:200;transition:opacity .3s;pointer-events:none;white-space:nowrap;font-family:'Sarabun',sans-serif;}
 #toast.h{opacity:0;}
-#sync-dot{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:#4caf50;}
-#sync-dot.syncing{background:#ff9800;}
-#sync-dot.error{background:#f44336;}
+
+/* ── LOCK overlay state ── */
+.locked-cell{cursor:default!important;}
+.locked-cell:active{opacity:1!important;}
+#lock-banner{background:#fff3c4;color:#7a5d20;font-size:11px;padding:4px 10px;text-align:center;border-bottom:1px solid #e9d090;flex-shrink:0;font-weight:600;}
+#lock-banner.hidden{display:none;}
 </style>
 </head>
 <body>
 
 <div id="app-header">
-  <span id="resort-short">🌿 Kornwat Garden Resort</span>
-  <span id="sync-dot" title="cloud sync"></span>
-  <button class="hd-btn" id="btn-save" title="บันทึก">💾</button>
-  <button class="hd-btn" id="btn-png" title="บันทึกรูป">📷</button>
-  <button class="hd-btn" id="btn-pdf" title="บันทึก PDF">📄</button>
+  <div class="hd-row hd-row-1">
+    <span id="resort-short">🌿 Kornwat Garden Resort</span>
+    <span id="sync-dot" title="สถานะคลาวด์"></span>
+  </div>
+  <div class="hd-row hd-row-2">
+    <button class="hd-btn locked" id="btn-lock" title="ล็อก/ปลดล็อก">🔒</button>
+    <button id="btn-save" title="บันทึก"><span>💾 บันทึก</span><span id="save-info">— ยังไม่มีการบันทึก</span></button>
+    <button class="hd-btn" id="btn-png" title="บันทึกรูป">📷</button>
+    <button class="hd-btn" id="btn-pdf" title="บันทึก PDF">📄</button>
+  </div>
 </div>
+<div id="lock-banner" class="hidden">🔓 โหมดแก้ไข — แตะปุ่ม 💾 บันทึก เมื่อแก้เสร็จ</div>
 
 <div id="main">
   <div id="schedule-view" class="view">
@@ -211,6 +239,40 @@ const TYPE_LBL = {regular:'ประจำ',parttime:'พาสไทม์',int
 const BADGE_CLS = {regular:'b-reg',parttime:'b-pt',intern:'b-int'};
 const CYCLE = {W:'OFF',OFF:'HALF',HALF:'W'};
 
+// Thai public holidays (วันหยุดนักขัตฤกษ์) by "YYYY-MM" → [day numbers]
+// Source: Thai Cabinet announcements / Bank of Thailand calendars
+const TH_HOLIDAYS = {
+  '2025-01':{days:[1],note:'วันขึ้นปีใหม่'},
+  '2025-02':{days:[12],note:'วันมาฆบูชา'},
+  '2025-04':{days:[7,14,15,16],note:'จักรี (ชดเชย) + สงกรานต์'},
+  '2025-05':{days:[1,5,12],note:'แรงงาน + ฉัตรมงคล + วิสาขบูชา'},
+  '2025-06':{days:[3],note:'วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี'},
+  '2025-07':{days:[10,28,29],note:'อาสาฬหบูชา + เข้าพรรษา + วันเฉลิม ร.10'},
+  '2025-08':{days:[12],note:'วันแม่แห่งชาติ'},
+  '2025-10':{days:[13,23],note:'วันคล้ายวันสวรรคต ร.9 + วันปิยมหาราช'},
+  '2025-12':{days:[5,10,31],note:'วันพ่อ + วันรัฐธรรมนูญ + วันสิ้นปี'},
+
+  '2026-01':{days:[1,2],note:'วันขึ้นปีใหม่ + ชดเชย'},
+  '2026-03':{days:[3],note:'วันมาฆบูชา'},
+  '2026-04':{days:[6,13,14,15],note:'จักรี + สงกรานต์'},
+  '2026-05':{days:[1,4,31],note:'แรงงาน + ฉัตรมงคล + วิสาขบูชา'},
+  '2026-06':{days:[1,3],note:'ชดเชยวิสาขบูชา + ราชินี'},
+  '2026-07':{days:[28,29,30],note:'วันเฉลิม ร.10 + อาสาฬหบูชา + เข้าพรรษา'},
+  '2026-08':{days:[12],note:'วันแม่แห่งชาติ'},
+  '2026-10':{days:[13,23],note:'วันคล้ายวันสวรรคต ร.9 + วันปิยมหาราช'},
+  '2026-12':{days:[7,10,31],note:'วันพ่อ (ชดเชย) + วันรัฐธรรมนูญ + วันสิ้นปี'},
+
+  '2027-01':{days:[1],note:'วันขึ้นปีใหม่'},
+  '2027-02':{days:[22],note:'วันมาฆบูชา'},
+  '2027-04':{days:[6,13,14,15],note:'จักรี + สงกรานต์'},
+  '2027-05':{days:[3,5,20],note:'แรงงาน (ชดเชย) + ฉัตรมงคล + วิสาขบูชา'},
+  '2027-06':{days:[3],note:'วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี'},
+  '2027-07':{days:[19,20,28],note:'อาสาฬหบูชา + เข้าพรรษา + วันเฉลิม ร.10'},
+  '2027-08':{days:[12],note:'วันแม่แห่งชาติ'},
+  '2027-10':{days:[13,25],note:'วันคล้ายวันสวรรคต ร.9 + ปิยมหาราช (ชดเชย)'},
+  '2027-12':{days:[6,10,31],note:'วันพ่อ (ชดเชย) + รัฐธรรมนูญ + สิ้นปี'},
+};
+
 // ═══════════════════ CLOUD ═══════════════════
 const SB_URL = 'https://xlsbabusatrlfolkrjmv.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsc2JhYnVzYXRybGZvbGtyam12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQyNzMsImV4cCI6MjA5MjUzMDI3M30.o8VJdMx6RFqOb1X96iJGey-NlHyx6KNFwLkYdq3_YU0';
@@ -258,7 +320,9 @@ async function pushAllNow(){
   setSync('syncing');
   try{
     for(const k of Object.keys(data)) await cloudUpsert(k, data[k]);
-    setSync('ok'); showToast('✓ บันทึกขึ้นคลาวด์แล้ว');
+    setSync('ok'); clearDirty(); showToast('✓ บันทึกขึ้นคลาวด์แล้ว');
+    // Auto-relock after save (prevent accidental edits afterwards)
+    if(!locked){ locked=true; applyLockUI(); }
   }catch(e){ setSync('error'); showToast('⚠ บันทึกไม่สำเร็จ'); console.error(e); }
 }
 
@@ -267,7 +331,9 @@ const EXCEL = {"2026-05":{"label":"พฤษภาคม 2026","year":2026,"mont
 
 // ═══════════════════ STATE ═══════════════════
 let data = {}, curKey = '', curView = 'schedule';
+let locked = true, isDirty = false, lastSavedAt = null;
 const LSK = 'kw_sched_v4';
+const LSK_META = 'kw_sched_v4_meta';
 
 const clone = o => JSON.parse(JSON.stringify(o));
 const sorted = () => Object.keys(data).sort();
@@ -282,11 +348,77 @@ async function init(){
   const saved = localStorage.getItem(LSK);
   data = saved ? (()=>{try{return JSON.parse(saved);}catch{return clone(EXCEL);}})() : clone(EXCEL);
   ensurePositionField(data);
+  // Load meta (lastSavedAt + dirty flag)
+  try{
+    const meta = JSON.parse(localStorage.getItem(LSK_META)||'{}');
+    lastSavedAt = meta.lastSavedAt || null;
+    isDirty = !!meta.isDirty;
+  }catch{ lastSavedAt=null; isDirty=false; }
   const ks = sorted();
   curKey = ks[ks.length-1] || '2026-05';
   setupEvents();
+  applyLockUI();
+  updateSaveLabel();
   render();
   await syncFromCloud();
+}
+
+// ── lock / dirty / save label ──
+function applyLockUI(){
+  const btn = document.getElementById('btn-lock');
+  const banner = document.getElementById('lock-banner');
+  if(locked){
+    btn.textContent='🔒'; btn.classList.add('locked'); btn.classList.remove('unlocked');
+    btn.title='ปลดล็อกเพื่อแก้ไข';
+    banner.classList.add('hidden');
+  }else{
+    btn.textContent='🔓'; btn.classList.add('unlocked'); btn.classList.remove('locked');
+    btn.title='ล็อก (อ่านอย่างเดียว)';
+    banner.classList.remove('hidden');
+  }
+}
+function toggleLock(){
+  locked = !locked;
+  applyLockUI();
+  showToast(locked?'🔒 ล็อกแล้ว':'🔓 ปลดล็อก — แก้ไขได้');
+}
+function markDirty(){
+  isDirty = true;
+  saveMeta();
+  updateSaveLabel();
+}
+function clearDirty(){
+  isDirty = false;
+  lastSavedAt = new Date().toISOString();
+  saveMeta();
+  updateSaveLabel();
+}
+function saveMeta(){
+  try{ localStorage.setItem(LSK_META, JSON.stringify({lastSavedAt, isDirty})); }catch{}
+}
+function fmtSavedAt(){
+  if(!lastSavedAt) return '— ยังไม่มีการบันทึก';
+  const t = new Date(lastSavedAt);
+  const now = new Date();
+  const sameDay = t.toDateString()===now.toDateString();
+  const hh = String(t.getHours()).padStart(2,'0');
+  const mm = String(t.getMinutes()).padStart(2,'0');
+  if(sameDay) return `บันทึกล่าสุด ${hh}:${mm}`;
+  const dd = String(t.getDate()).padStart(2,'0');
+  const mo = String(t.getMonth()+1).padStart(2,'0');
+  return `บันทึกล่าสุด ${dd}/${mo} ${hh}:${mm}`;
+}
+function updateSaveLabel(){
+  const info = document.getElementById('save-info');
+  const btn = document.getElementById('btn-save');
+  if(!info||!btn) return;
+  if(isDirty){
+    info.textContent = '• ยังไม่บันทึก';
+    btn.classList.add('dirty');
+  }else{
+    info.textContent = fmtSavedAt();
+    btn.classList.remove('dirty');
+  }
 }
 
 function ensurePositionField(d){
@@ -300,7 +432,12 @@ async function syncFromCloud(){
   try{
     const rows = await cloudList();
     if(!rows.length){
+      // First-time bootstrap — push local data up
       for(const k of Object.keys(data)) await cloudUpsert(k, data[k]);
+    }else if(isDirty){
+      // Don't overwrite unsaved local changes — keep local, log it
+      console.info('Local has unsaved changes — skipping cloud overwrite. Press 💾 to push.');
+      showToast('⚠ มีข้อมูลที่ยังไม่บันทึก กดปุ่ม 💾 เพื่ออัพโหลด');
     }else{
       const cloudData = {};
       rows.forEach(r => cloudData[r.key] = r.data);
@@ -317,12 +454,22 @@ async function syncFromCloud(){
 
 function setupEvents(){
   document.querySelectorAll('.nb').forEach(b => b.onclick = () => switchView(b.dataset.v));
-  document.getElementById('fab').onclick = ()=>showAddEmpModal();
+  document.getElementById('fab').onclick = ()=>{ if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; } showAddEmpModal(); };
   document.getElementById('modal-cl').onclick = closeModal;
   document.getElementById('modal-ov').onclick = e => { if(e.target===document.getElementById('modal-ov')) closeModal(); };
-  document.getElementById('btn-save').onclick = pushAllNow;
+  document.getElementById('btn-lock').onclick = toggleLock;
+  document.getElementById('btn-save').onclick = saveNow;
   document.getElementById('btn-png').onclick = exportPNG;
   document.getElementById('btn-pdf').onclick = exportPDF;
+  // Warn before leaving with unsaved changes
+  window.addEventListener('beforeunload', e=>{
+    if(isDirty){ e.preventDefault(); e.returnValue=''; }
+  });
+}
+
+async function saveNow(){
+  if(!isDirty){ showToast('ℹ️ ไม่มีการเปลี่ยนแปลง'); return; }
+  await pushAllNow();
 }
 
 function switchView(v){
@@ -458,11 +605,12 @@ function renderSchedule(){
 
 // ═══════════════════ INTERACTIONS ═══════════════════
 function tap(ei,d){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน (กดปุ่ม 🔒 ด้านบน)'); return; }
   const m=data[curKey]; if(!m) return;
   const emp=m.employees[ei]; if(!emp) return;
   if(!emp.schedule) emp.schedule={};
   emp.schedule[d]=CYCLE[emp.schedule[d]||'W']||'W';
-  saveLocal(); schedulePush(curKey);
+  saveLocal(); markDirty();
   const ph=new Set(m.publicHolidays||[]);
   const s=emp.schedule[d];
   const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
@@ -510,7 +658,7 @@ function saveEmpName(ei){
   e.position = document.getElementById('en-pos').value.trim();
   e.no = document.getElementById('en-no').value.trim();
   e.type = document.getElementById('en-type').value;
-  saveLocal(); schedulePush(curKey); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
 function editGroup(d){
@@ -528,7 +676,7 @@ function saveGroup(d){
   const v=document.getElementById('grp-inp').value.trim();
   if(!data[curKey].groups) data[curKey].groups={};
   if(v) data[curKey].groups[d]=v; else delete data[curKey].groups[d];
-  saveLocal(); schedulePush(curKey); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
 function editRemark(ei){
@@ -541,11 +689,18 @@ function editRemark(ei){
 }
 function saveRemark(ei){
   data[curKey].employees[ei].remark=document.getElementById('rem-inp').value.trim();
-  saveLocal(); schedulePush(curKey); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
 // ═══════════════════ TAB ACTIONS ═══════════════════
 function selectMonth(k){ curKey=k; render(); if(curView==='manage') renderManage(); }
+
+function lookupThaiHolidays(y, mo){
+  const key = `${y}-${String(mo).padStart(2,'0')}`;
+  const found = TH_HOLIDAYS[key];
+  if(!found) return {days:[], note:''};
+  return {days:[...new Set(found.days)].sort((a,b)=>a-b), note:found.note||''};
+}
 
 function addNextMonth(){
   const ks=sorted();
@@ -561,12 +716,32 @@ function addNextMonth(){
   const key=`${y}-${String(mo).padStart(2,'0')}`;
   if(data[key]){ showToast('มีเดือนนี้แล้ว'); curKey=key; render(); return; }
   const days=new Date(y,mo,0).getDate();
+
+  // Auto-load Thai holidays for this month
+  const phInfo = lookupThaiHolidays(y, mo);
+  const ph = phInfo.days.filter(d=>d>=1 && d<=days);
+  const phCount = ph.length;
+
+  // Carry over employees; regular employees accrue phCount new ph days
   const emps = (last && data[last].employees||[]).filter(e=>e.name).map(e=>{
     const s={}; for(let d=1;d<=days;d++) s[d]='W';
-    return {no:e.no||'',name:e.name,position:e.position||'',type:e.type,schedule:s,vacUsed:'',phTotal:'',phRemain:e.phRemain||'',remark:''};
+    let phTotal='', phRemain='';
+    if(e.type==='regular'){
+      const prevRemain = parseFloat(e.phRemain) || 0;
+      const tot = prevRemain + phCount;
+      phTotal = String(tot);
+      phRemain = String(tot); // not used yet this month
+    }
+    return {no:e.no||'',name:e.name,position:e.position||'',type:e.type,schedule:s,vacUsed:'',phTotal,phRemain,remark:''};
   });
-  data[key]={label:`${MONTH_TH[mo]} ${y}`,year:y,month:mo,days,note:'',publicHolidays:[],groups:{},employees:emps};
-  curKey=key; saveLocal(); schedulePush(key); render(); showToast('สร้างเดือน '+MONTH_TH[mo]+' '+beYear(y)+' แล้ว');
+
+  const note = phCount
+    ? `เดือน ${MONTH_TH[mo]} หยุด ${phCount} วัน (${ph.join(', ')}) — ${phInfo.note} · วันหยุดเพิ่ม ${phCount} วัน`
+    : `เดือน ${MONTH_TH[mo]} — ไม่มีวันหยุดเพิ่ม`;
+
+  data[key]={label:`${MONTH_TH[mo]} ${y}`,year:y,month:mo,days,note,publicHolidays:ph,groups:{},employees:emps};
+  curKey=key; saveLocal(); markDirty(); render();
+  showToast(`สร้างเดือน ${MONTH_TH[mo]} ${beYear(y)} แล้ว${phCount?` (+${phCount} วันหยุด)`:''}`);
 }
 
 // ═══════════════════ SUMMARY ═══════════════════
@@ -682,7 +857,7 @@ function delEmp(ei){
   const e=data[curKey].employees[ei];
   if(!confirm(`ลบ "${e.name}"?`)) return;
   data[curKey].employees.splice(ei,1);
-  saveLocal(); schedulePush(curKey); render(); renderManage(); showToast('ลบพนักงานแล้ว');
+  saveLocal(); markDirty(); render(); renderManage(); showToast('ลบพนักงานแล้ว');
 }
 async function resetAll(){
   if(!confirm('รีเซ็ตข้อมูลทั้งหมด? การแก้ไขจะหายไป')) return;
@@ -730,7 +905,7 @@ function addEmp(){
     schedule:sched,vacUsed:'',phTotal:'',
     phRemain:document.getElementById('np-ph').value||'0',remark:''
   });
-  saveLocal(); schedulePush(curKey); closeModal(); render(); if(curView==='manage') renderManage(); showToast('เพิ่มแล้ว');
+  saveLocal(); markDirty(); closeModal(); render(); if(curView==='manage') renderManage(); showToast('เพิ่มแล้ว');
 }
 
 function showEditHolidayModal(){
@@ -747,54 +922,140 @@ function saveHoliday(){
   const phStr=document.getElementById('eh-ph').value.trim();
   data[curKey].publicHolidays=phStr?phStr.split(',').map(s=>+s.trim()).filter(n=>n&&!isNaN(n)):[];
   data[curKey].note=document.getElementById('eh-note').value.trim();
-  saveLocal(); schedulePush(curKey); closeModal(); render(); renderManage(); showToast('บันทึกแล้ว');
+  saveLocal(); markDirty(); closeModal(); render(); renderManage(); showToast('บันทึกแล้ว');
 }
 
 // ═══════════════════ EXPORT ═══════════════════
+function isMobile(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
+
+// Capture the schedule table at full natural width — clone offscreen,
+// strip sticky positioning so left column doesn't overlap day cells.
 async function captureTable(){
-  const frame = document.getElementById('tbl-frame');
-  if(typeof html2canvas==='undefined'){ alert('html2canvas ไม่พร้อม — เช็คเน็ตและรีโหลด'); return null; }
+  if(typeof html2canvas==='undefined'){
+    showToast('⚠ html2canvas ไม่พร้อม — เช็คเน็ตและรีโหลด'); return null;
+  }
+  const original = document.getElementById('tbl-frame');
+  if(!original){ showToast('⚠ ไม่พบตาราง'); return null; }
+
   showToast('⏳ กำลังสร้างรูป...');
-  const canvas = await html2canvas(frame, {
-    backgroundColor:'#fffdf5',
-    scale: 2,
-    useCORS:true,
-    windowWidth: frame.scrollWidth,
-    windowHeight: frame.scrollHeight,
+
+  // Switch to schedule view so the table is in the DOM tree fully rendered
+  const wasView = curView;
+  if(wasView!=='schedule'){ switchView('schedule'); await new Promise(r=>setTimeout(r,80)); }
+
+  // Build a fully-rendered standalone container (no scroll wrappers, no sticky)
+  const host = document.createElement('div');
+  host.style.cssText='position:fixed;left:-200000px;top:0;background:#fffdf5;padding:18px;display:inline-block;';
+  const clone = original.cloneNode(true);
+  clone.style.cssText='display:inline-block;border:2px solid #d99672;border-radius:8px;overflow:visible;background:#fffdf5;max-width:none;';
+
+  // Strip sticky from header/body name cells inside the clone
+  clone.querySelectorAll('.nc, .nc-body').forEach(el=>{
+    el.style.position='static';
+    el.style.zIndex='auto';
   });
-  return canvas;
+  // Make sure the table renders at natural width
+  const tbl = clone.querySelector('#sched-tbl');
+  if(tbl){ tbl.style.width='auto'; }
+
+  host.appendChild(clone);
+  document.body.appendChild(host);
+
+  // Allow layout
+  await new Promise(r=>setTimeout(r,60));
+
+  const w = host.scrollWidth;
+  const h = host.scrollHeight;
+
+  try{
+    const canvas = await html2canvas(host, {
+      backgroundColor:'#fffdf5',
+      scale: 2,
+      width: w, height: h,
+      windowWidth: w, windowHeight: h,
+      useCORS:true, allowTaint:true, logging:false,
+      scrollX:0, scrollY:0,
+    });
+    return canvas;
+  }finally{
+    document.body.removeChild(host);
+    if(wasView!=='schedule') switchView(wasView);
+  }
 }
+
 async function exportPNG(){
   try{
     const canvas = await captureTable(); if(!canvas) return;
-    canvas.toBlob(blob=>{
+    const label = (data[curKey]&&data[curKey].label)||'schedule';
+    const fname = `ตารางพนักงาน-${label}.png`;
+
+    canvas.toBlob(async (blob)=>{
+      if(!blob){ showToast('⚠ สร้างรูปไม่สำเร็จ'); return; }
+      // Try Web Share API (mobile-friendly)
+      if(isMobile() && navigator.share && navigator.canShare){
+        const file = new File([blob], fname, {type:'image/png'});
+        if(navigator.canShare({files:[file]})){
+          try{
+            await navigator.share({files:[file], title:label, text:'ตารางพนักงาน '+label});
+            showToast('📷 พร้อมแชร์'); return;
+          }catch(e){ if(e.name==='AbortError') return; }
+        }
+      }
+      // Fallback: download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href=url; a.download=`ตารางพนักงาน-${data[curKey].label}.png`;
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),5000);
+      a.href=url; a.download=fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
       showToast('📷 บันทึกรูปแล้ว');
-    },'image/png');
-  }catch(e){ console.error(e); showToast('⚠ บันทึกรูปไม่สำเร็จ'); }
+    },'image/png', 0.95);
+  }catch(e){ console.error(e); showToast('⚠ บันทึกรูปไม่สำเร็จ: '+e.message); }
 }
+
 async function exportPDF(){
   try{
     const canvas = await captureTable(); if(!canvas) return;
-    if(typeof jspdf==='undefined' && typeof window.jspdf==='undefined'){ alert('jspdf ไม่พร้อม'); return; }
+    if(!window.jspdf){ showToast('⚠ jspdf ไม่พร้อม'); return; }
     const {jsPDF} = window.jspdf;
-    const imgData = canvas.toDataURL('image/png');
+
     const w = canvas.width, h = canvas.height;
-    const orient = w>h?'landscape':'portrait';
-    const pdf = new jsPDF({orientation:orient, unit:'pt', format:'a4'});
+    // Always landscape for wide schedule
+    const pdf = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const scale = Math.min(pageW/w, pageH/h);
-    const drawW = w*scale, drawH = h*scale;
-    const x = (pageW-drawW)/2, y = (pageH-drawH)/2;
-    pdf.addImage(imgData,'PNG',x,y,drawW,drawH);
-    pdf.save(`ตารางพนักงาน-${data[curKey].label}.pdf`);
+    const margin = 14;
+    const usableW = pageW - margin*2;
+    const usableH = pageH - margin*2;
+
+    // Fit to width, paginate vertically if too tall
+    const scale = usableW / w;
+    const drawW = usableW;
+    const drawH = h * scale;
+
+    if(drawH <= usableH){
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData,'PNG', margin, margin + (usableH-drawH)/2, drawW, drawH);
+    }else{
+      // Slice canvas into page-height chunks
+      const sliceH = usableH / scale; // source pixels per page
+      let y = 0;
+      while(y < h){
+        const curSliceH = Math.min(sliceH, h - y);
+        const slice = document.createElement('canvas');
+        slice.width = w; slice.height = curSliceH;
+        const ctx = slice.getContext('2d');
+        ctx.drawImage(canvas, 0, y, w, curSliceH, 0, 0, w, curSliceH);
+        const imgData = slice.toDataURL('image/png');
+        if(y>0) pdf.addPage('a4','landscape');
+        pdf.addImage(imgData,'PNG', margin, margin, drawW, curSliceH * scale);
+        y += sliceH;
+      }
+    }
+
+    const label = (data[curKey]&&data[curKey].label)||'schedule';
+    pdf.save(`ตารางพนักงาน-${label}.pdf`);
     showToast('📄 บันทึก PDF แล้ว');
-  }catch(e){ console.error(e); showToast('⚠ บันทึก PDF ไม่สำเร็จ'); }
+  }catch(e){ console.error(e); showToast('⚠ บันทึก PDF ไม่สำเร็จ: '+e.message); }
 }
 
 // ═══════════════════ TOAST ═══════════════════

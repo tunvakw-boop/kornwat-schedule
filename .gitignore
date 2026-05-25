@@ -3,3 +3,4 @@ Thumbs.db
 *.tmp
 .excel_data.tmp
 node_modules/
+_source/

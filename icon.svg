@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbe2d3"/>
+      <stop offset="1" stop-color="#f7c4ab"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#fff2ec"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="url(#bg)"/>
+  <rect x="38" y="56" width="124" height="108" rx="10" fill="url(#card)" stroke="#e9b8a0" stroke-width="1.2"/>
+  <rect x="38" y="56" width="124" height="26" rx="10" fill="#f08977"/>
+  <rect x="38" y="74" width="124" height="8" fill="#f08977"/>
+  <circle cx="58" cy="69" r="8.5" fill="#d63a3a"/>
+  <text x="58" y="73" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" font-weight="700" fill="#fff">S</text>
+  <g fill="#fac2b0">
+    <rect x="50"  y="92"  width="14" height="14" rx="2"/>
+    <rect x="68"  y="92"  width="14" height="14" rx="2"/>
+    <rect x="86"  y="92"  width="14" height="14" rx="2"/>
+    <rect x="104" y="92"  width="14" height="14" rx="2"/>
+    <rect x="122" y="92"  width="14" height="14" rx="2"/>
+    <rect x="140" y="92"  width="14" height="14" rx="2"/>
+    <rect x="50"  y="110" width="14" height="14" rx="2"/>
+    <rect x="68"  y="110" width="14" height="14" rx="2"/>
+    <rect x="86"  y="110" width="14" height="14" rx="2"/>
+    <rect x="104" y="110" width="14" height="14" rx="2"/>
+    <rect x="122" y="110" width="14" height="14" rx="2"/>
+    <rect x="140" y="110" width="14" height="14" rx="2"/>
+    <rect x="50"  y="128" width="14" height="14" rx="2"/>
+    <rect x="68"  y="128" width="14" height="14" rx="2"/>
+    <rect x="86"  y="128" width="14" height="14" rx="2"/>
+    <rect x="104" y="128" width="14" height="14" rx="2"/>
+    <rect x="122" y="128" width="14" height="14" rx="2"/>
+    <rect x="140" y="128" width="14" height="14" rx="2"/>
+    <rect x="50"  y="146" width="14" height="14" rx="2"/>
+    <rect x="68"  y="146" width="14" height="14" rx="2"/>
+    <rect x="86"  y="146" width="14" height="14" rx="2"/>
+  </g>
+  <g transform="translate(108 62) rotate(38)">
+    <rect x="0" y="0" width="58" height="11" rx="1.5" fill="#ffffff" stroke="#d8a294" stroke-width="0.9"/>
+    <rect x="44" y="0" width="14" height="11" rx="1.5" fill="#f08977"/>
+    <polygon points="58,0 70,5.5 58,11" fill="#5d5d5d"/>
+    <polygon points="65,3.5 70,5.5 65,7.5" fill="#2d2d2d"/>
+  </g>
+</svg>
