@@ -688,7 +688,7 @@ function renderSchedule(){
       </td>
       ${cells}
       <td class="sc wk" id="wk-${ei}">${fmtNum(st.wk)}</td>
-      <td class="sc of" id="of-${ei}">${st.off}</td>
+      <td class="sc of" id="of-${ei}">${fmtNum(st.actualOff)}</td>
       <td class="sc vc" id="vc-${ei}" onclick="${vacEditHandler}" title="${st.auto?'คำนวณอัตโนมัติ — แตะเพื่อดูรายละเอียด':'แตะเพื่อแก้ไข'}">${vacUsedDisp||'<span style="color:#ccc;">—</span>'}</td>
       <td class="sc ph" id="pht-${ei}" onclick="${phEditHandler}" title="${st.auto?'แตะเพื่อแก้ไข ที่มี (carryover)':'แตะเพื่อแก้ไข'}">${phTotalDisp||'<span style="color:#ccc;">—</span>'}</td>
       <td class="sc ph" id="phr-${ei}">${phRemainDisp||'<span style="color:#ccc;">—</span>'}</td>
@@ -759,7 +759,7 @@ function updateRowTotals(ei){
   const ptEl=document.getElementById(`pht-${ei}`);
   const prEl=document.getElementById(`phr-${ei}`);
   if(wEl) wEl.textContent = fmtNum(st.wk);
-  if(oEl) oEl.textContent = st.off;
+  if(oEl) oEl.textContent = fmtNum(st.actualOff);
   if(st.auto){
     if(vEl) vEl.textContent = fmtNum(st.vacUsed);
     if(ptEl) ptEl.textContent = fmtNum(st.phTotal);
@@ -1030,7 +1030,7 @@ function renderSummary(){
       <td><span style="color:#e07b54;font-weight:700;">${esc(emp.name)}</span>${emp.position?`<br><span style="font-size:9px;color:#888;">${esc(emp.position)}</span>`:''}<br>
         <span class="badge ${BADGE_CLS[emp.type]||'b-reg'}">${TYPE_LBL[emp.type]||''}</span></td>
       <td style="color:#2e7d32;font-weight:700;">${fmtNum(st.wk)}</td>
-      <td style="color:#c0392b;font-weight:700;">${st.off}</td>
+      <td style="color:#c0392b;font-weight:700;">${fmtNum(st.actualOff)}</td>
       <td style="color:#d97706;">${st.half||'-'}</td>
       <td style="color:#1565c0;">${v||'-'}</td>
       <td style="color:#6a1b9a;">${pt||'-'}</td>
