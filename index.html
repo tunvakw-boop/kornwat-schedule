@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ตารางพนักงาน - Kornwat Garden Resort</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:'Sarabun',sans-serif;}
+body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflow:hidden;color:#3d2914;}
+
+/* ── HEADER ── */
+#app-header{background:#e07b54;color:#fff;height:50px;display:flex;align-items:center;padding:0 8px;gap:4px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+#resort-short{font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px;}
+.hd-btn{background:rgba(255,255,255,.22);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hd-btn:active{background:rgba(255,255,255,.45);transform:scale(.92);}
+
+/* ── VIEWS ── */
+#main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.view{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+.view.hidden{display:none!important;}
+
+/* ── SCHEDULE VIEW ── */
+.sched-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px;}
+.tbl-frame{display:inline-block;border:2px solid #d99672;border-radius:8px;overflow:hidden;background:#fffdf5;}
+
+#sched-tbl{border-collapse:collapse;font-size:11px;white-space:nowrap;background:#fffdf5;}
+#sched-tbl th,#sched-tbl td{border:1px solid #e8c4a8;padding:0;text-align:center;vertical-align:middle;font-family:'Sarabun',sans-serif;}
+
+/* Title row — bigger, prominent */
+.title-row td{background:#fef0e0;padding:14px 12px 10px;border-bottom:2px solid #d99672!important;}
+.title-row span{color:#c44a1f;font-size:19px;font-weight:800;letter-spacing:.3px;font-family:'Sarabun',sans-serif;}
+.title-row .sub{color:#8b4513;font-size:13px;font-weight:600;margin-top:2px;display:block;}
+
+/* Sticky name col */
+.nc{position:sticky;left:0;z-index:3;background:#fde8d8;min-width:110px;max-width:110px;text-align:left!important;padding:4px 6px!important;border-right:2px solid #d99672!important;font-size:11px;font-weight:700;color:#8b4513;}
+.nc-body{position:sticky;left:0;z-index:2;background:#fffdf5;min-width:110px;max-width:110px;text-align:left!important;padding:4px 6px!important;border-right:2px solid #d99672!important;}
+
+/* Header rows — uniform */
+.hdr1 th,.hdr2 th{background:#fde8d8;color:#8b4513;font-size:11px;font-weight:700;height:26px;font-family:'Sarabun',sans-serif;}
+.hdr1 th.wknd,.hdr2 th.wknd{background:#fce4ec;color:#c2185b;}
+.hdr2 th{font-size:10px;height:22px;font-weight:600;}
+.sub-hd{background:#fde8d8;color:#8b4513;font-size:11px;font-weight:700;padding:2px 4px!important;line-height:1.15;}
+.sub-hd-sm{font-size:10px;font-weight:600;}
+
+/* Day cells — balanced, same font/size */
+.dc{width:26px;min-width:26px;height:30px;cursor:pointer;user-select:none;font-size:10px;font-weight:700;color:transparent;font-family:'Sarabun',sans-serif;}
+.dc:active{opacity:.65;}
+.dc.W{background:#d5edd8;}
+.dc.OFF{background:#e74c3c;color:#fff;font-weight:800;}
+.dc.HALF{background:#fef3c0;color:#d97706;font-weight:700;}
+.dc.wknd.W{background:#cce8d0;}
+.dc.pub-h{position:relative;}
+.dc.pub-h::after{content:'★';position:absolute;top:0;right:1px;font-size:7px;color:#ff6f00;line-height:1.2;}
+
+/* Employee name cell */
+.emp-name{color:#c44a1f;font-weight:700;font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;line-height:1.2;cursor:pointer;}
+.emp-pos{font-size:9px;display:block;color:#666;line-height:1.15;margin-top:1px;}
+.emp-no-cell{text-align:center!important;font-size:11px;font-weight:700;color:#8b4513;}
+
+/* Summary cols */
+.sc{min-width:30px;width:30px;height:30px;font-size:11px;font-weight:700;background:#fffdf5;font-family:'Sarabun',sans-serif;}
+.sc.wk{color:#2e7d32;}.sc.of{color:#c0392b;}.sc.vc{color:#1565c0;}.sc.ph{color:#6a1b9a;}
+
+/* Remark col */
+.rc{min-width:90px;font-size:10px;color:#555;text-align:left!important;padding:3px 5px!important;background:#fffdf5;cursor:pointer;}
+
+/* Group row */
+.grp-row td{background:#fef3e2;height:64px;}
+.grp-row .nc-body{background:#fde8d8;color:#8b4513;font-weight:700;font-size:11px;}
+.grp-cell{cursor:pointer;font-size:10px;color:#5d4037;writing-mode:vertical-rl;transform:rotate(180deg);padding:2px!important;font-weight:600;font-family:'Sarabun',sans-serif;}
+.grp-cell:active{background:#fce4ec!important;}
+.grp-cell.has-grp{background:#fff3e0;}
+
+/* Excel-style month tabs */
+#month-tabs{display:flex;background:#f0e0d0;border-top:2px solid #d99672;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;height:36px;align-items:flex-end;padding:0 2px;}
+#month-tabs::-webkit-scrollbar{height:0;}
+.mtab{flex-shrink:0;padding:7px 14px 6px;background:#e8d8c4;color:#5d4037;border:1px solid #c4a484;border-bottom:none;border-radius:0;font-size:11px;font-weight:600;cursor:pointer;margin-right:1px;font-family:'Sarabun',sans-serif;white-space:nowrap;line-height:1.2;border-top-left-radius:4px;border-top-right-radius:4px;height:30px;display:flex;align-items:center;gap:4px;}
+.mtab.active{background:#fffdf5;color:#c44a1f;font-weight:800;border-color:#d99672;border-bottom:2px solid #fffdf5;margin-bottom:-2px;height:32px;z-index:2;}
+.mtab:active{opacity:.7;}
+.mtab-add{flex-shrink:0;width:32px;height:30px;background:#fff;color:#e07b54;border:1px solid #c4a484;border-bottom:none;border-top-left-radius:4px;border-top-right-radius:4px;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+.mtab-add:active{background:#fef0e0;}
+
+/* Note bar */
+#note-bar{background:#fff9c4;color:#5d4037;font-size:11px;padding:5px 10px;border-top:1px solid #f0e0a0;flex-shrink:0;display:none;font-family:'Sarabun',sans-serif;}
+
+/* Legend */
+.legend{display:flex;gap:10px;padding:5px 10px;background:#fef9e7;border-top:1px solid #f4b8a0;flex-shrink:0;flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#8b4513;font-family:'Sarabun',sans-serif;}
+.leg-dot{width:13px;height:13px;border-radius:2px;display:inline-block;border:1px solid #ddd;}
+
+/* ── SUMMARY VIEW ── */
+#summary-view{overflow:auto;padding:10px;}
+.sum-card{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15);}
+.sum-card-hd{background:#e07b54;color:#fff;padding:8px 12px;font-size:13px;font-weight:700;}
+.sum-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.sum-tbl th{background:#fde8d8;color:#8b4513;padding:5px 6px;font-size:10px;font-weight:700;}
+.sum-tbl td{padding:6px 8px;border-bottom:1px solid #f9f0e8;}
+.sum-tbl tr:last-child td{border-bottom:none;}
+.sum-tbl td:first-child{text-align:left;font-weight:600;color:#e07b54;}
+.badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;}
+.b-reg{background:#e8f5e9;color:#2e7d32;}.b-pt{background:#e3f2fd;color:#1565c0;}.b-int{background:#fff3e0;color:#e65100;}
+
+/* ── MANAGE VIEW ── */
+#manage-view{overflow:auto;padding:10px;}
+.mg-sec{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.mg-hd{background:#e07b54;color:#fff;padding:9px 12px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.mg-body{padding:10px;}
+.mg-item{display:flex;align-items:center;justify-content:space-between;padding:7px 4px;border-bottom:1px solid #fde8d8;gap:8px;}
+.mg-item:last-child{border-bottom:none;}
+.btn-sm{padding:5px 10px;border:none;border-radius:4px;font-size:11px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;}
+.btn-add{background:#e07b54;color:#fff;}
+.btn-edit{background:#e3f2fd;color:#1565c0;}
+.btn-del{background:#ffebee;color:#c62828;}
+.btn-pri{background:#e07b54;color:#fff;padding:8px 16px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;}
+.btn-sec{background:#e0e0e0;color:#333;padding:8px 16px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;}
+.fg{margin-bottom:11px;}.fg label{display:block;font-size:11px;color:#8b4513;margin-bottom:3px;font-weight:600;}
+.fg input,.fg select,.fg textarea{width:100%;padding:8px 10px;border:1px solid #f4b8a0;border-radius:5px;font-size:13px;font-family:'Sarabun',sans-serif;background:#fff;}
+.fg textarea{height:60px;resize:vertical;}
+.fr{display:flex;gap:8px;}.fr .fg{flex:1;}
+
+/* ── MODAL ── */
+#modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;}
+#modal-ov.hidden{display:none;}
+#modal-box{background:#fff;border-radius:12px;width:100%;max-width:380px;overflow:hidden;max-height:88vh;display:flex;flex-direction:column;}
+#modal-hd{background:#e07b54;color:#fff;padding:13px 16px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+#modal-cl{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
+#modal-bd{padding:14px;overflow-y:auto;}
+#modal-ft{padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #fde8d8;}
+
+/* ── BOTTOM NAV ── */
+#bottom-nav{display:flex;background:#fff;border-top:1px solid #f4b8a0;height:54px;flex-shrink:0;}
+.nb{flex:1;border:none;background:none;font-family:'Sarabun',sans-serif;font-size:10px;color:#aaa;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:600;}
+.nb .ni{font-size:18px;}
+.nb.active{color:#e07b54;}
+
+/* ── FAB ── */
+#fab{position:fixed;right:14px;bottom:100px;width:46px;height:46px;border-radius:50%;background:#e07b54;color:#fff;border:none;font-size:22px;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.3);z-index:50;display:flex;align-items:center;justify-content:center;font-family:'Sarabun',sans-serif;}
+#fab.hidden{display:none;}
+#fab:active{transform:scale(.93);}
+
+/* ── TOAST + SYNC ── */
+#toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:7px 14px;border-radius:18px;font-size:12px;z-index:200;transition:opacity .3s;pointer-events:none;white-space:nowrap;font-family:'Sarabun',sans-serif;}
+#toast.h{opacity:0;}
+#sync-dot{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:#4caf50;}
+#sync-dot.syncing{background:#ff9800;}
+#sync-dot.error{background:#f44336;}
+</style>
+</head>
+<body>
+
+<div id="app-header">
+  <span id="resort-short">🌿 Kornwat Garden Resort</span>
+  <span id="sync-dot" title="cloud sync"></span>
+  <button class="hd-btn" id="btn-save" title="บันทึก">💾</button>
+  <button class="hd-btn" id="btn-png" title="บันทึกรูป">📷</button>
+  <button class="hd-btn" id="btn-pdf" title="บันทึก PDF">📄</button>
+</div>
+
+<div id="main">
+  <div id="schedule-view" class="view">
+    <div class="sched-wrap" id="sched-wrap">
+      <div class="tbl-frame" id="tbl-frame">
+        <table id="sched-tbl">
+          <thead id="tbl-head"></thead>
+          <tbody id="tbl-body"></tbody>
+          <tfoot id="tbl-foot"></tfoot>
+        </table>
+      </div>
+    </div>
+    <div id="month-tabs"></div>
+    <div class="legend">
+      <div class="leg-item"><span class="leg-dot" style="background:#d5edd8;"></span>ทำงาน</div>
+      <div class="leg-item"><span class="leg-dot" style="background:#e74c3c;border-color:#c0392b;"></span><span style="color:#fff;background:#e74c3c;padding:1px 5px;border-radius:2px;font-weight:700;font-size:9px;">OFF</span></div>
+      <div class="leg-item"><span class="leg-dot" style="background:#fef3c0;"></span>ครึ่งวัน</div>
+      <div class="leg-item"><span style="color:#ff6f00;font-size:10px;">★</span>วันหยุดนักขัตฤกษ์</div>
+    </div>
+    <div id="note-bar"></div>
+  </div>
+
+  <div id="summary-view" class="view hidden"></div>
+  <div id="manage-view" class="view hidden"></div>
+</div>
+
+<nav id="bottom-nav">
+  <button class="nb active" data-v="schedule"><span class="ni">📅</span>ตาราง</button>
+  <button class="nb" data-v="summary"><span class="ni">📊</span>สรุป</button>
+  <button class="nb" data-v="manage"><span class="ni">⚙️</span>จัดการ</button>
+</nav>
+
+<button id="fab">+</button>
+
+<div id="modal-ov" class="hidden">
+  <div id="modal-box">
+    <div id="modal-hd"><span id="modal-title"></span><button id="modal-cl">×</button></div>
+    <div id="modal-bd"></div>
+    <div id="modal-ft"></div>
+  </div>
+</div>
+<div id="toast" class="h"></div>
+
+<script>
+// ═══════════════════ CONST ═══════════════════
+const MONTH_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const MONTH_TH_SHORT = ['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+const MONTH_EN = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const TYPE_LBL = {regular:'ประจำ',parttime:'พาสไทม์',intern:'ฝึกงาน'};
+const BADGE_CLS = {regular:'b-reg',parttime:'b-pt',intern:'b-int'};
+const CYCLE = {W:'OFF',OFF:'HALF',HALF:'W'};
+
+// ═══════════════════ CLOUD ═══════════════════
+const SB_URL = 'https://xlsbabusatrlfolkrjmv.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsc2JhYnVzYXRybGZvbGtyam12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQyNzMsImV4cCI6MjA5MjUzMDI3M30.o8VJdMx6RFqOb1X96iJGey-NlHyx6KNFwLkYdq3_YU0';
+
+async function sbFetch(method, path, body, extraHeaders){
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer '+SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': method==='POST'?'return=representation':'',
+  };
+  if(extraHeaders) Object.assign(headers, extraHeaders);
+  const res = await fetch(SB_URL+'/rest/v1/'+path, {method, headers, body: body?JSON.stringify(body):undefined});
+  if(!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+function setSync(state){ // ok | syncing | error
+  const d = document.getElementById('sync-dot');
+  d.className = state==='ok'?'':state;
+}
+
+async function cloudList(){
+  return await sbFetch('GET','schedule_months?select=key,data&order=key.desc');
+}
+async function cloudUpsert(key, monthData){
+  return await sbFetch('POST','schedule_months',[{key, data:monthData}],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+}
+async function cloudDelete(key){
+  return await sbFetch('DELETE','schedule_months?key=eq.'+encodeURIComponent(key));
+}
+
+const pushTimers = {};
+function schedulePush(k){
+  setSync('syncing');
+  clearTimeout(pushTimers[k]);
+  pushTimers[k] = setTimeout(async ()=>{
+    try{ await cloudUpsert(k, data[k]); setSync('ok'); }
+    catch(e){ console.error('push',e); setSync('error'); }
+  }, 700);
+}
+
+async function pushAllNow(){
+  setSync('syncing');
+  try{
+    for(const k of Object.keys(data)) await cloudUpsert(k, data[k]);
+    setSync('ok'); showToast('✓ บันทึกขึ้นคลาวด์แล้ว');
+  }catch(e){ setSync('error'); showToast('⚠ บันทึกไม่สำเร็จ'); console.error(e); }
+}
+
+// ═══════════════════ SEED DATA (initial Excel) ═══════════════════
+const EXCEL = {"2026-05":{"label":"พฤษภาคม 2026","year":2026,"month":5,"days":31,"note":"เดือน พฤษภาคม หยุด 2 วัน (วันที่ 1 วันแรงงาน / วันที่ 31 วันวิสาขบูชา) — วันหยุดเพิ่ม 2 วัน","publicHolidays":[1,31],"groups":{"21":"กรุ๊ป ศึกษาธิการ ชร","27":"กรุ๊ป พี่แคท","28":"กรุ๊ป พี่แคท","29":"กรุ๊ป พี่แคท"},"employees":[{"no":"1","name":"ยายปิน","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"OFF","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"OFF","12":"W","13":"W","14":"W","15":"W","16":"W","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"OFF","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"1","phTotal":"4","phRemain":"3","remark":""},{"no":"2","name":"หลุยส์","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"OFF","11":"OFF","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"HALF","25":"OFF","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"0.5","phTotal":"3.5","phRemain":"3","remark":""},{"no":"3","name":"พี่ทิพย์","position":"","type":"regular","schedule":{"1":"OFF","2":"W","3":"W","4":"W","5":"W","6":"W","7":"OFF","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"OFF","31":"W"},"vacUsed":"1","phTotal":"3","phRemain":"2","remark":""},{"no":"4","name":"สาม","position":"","type":"regular","schedule":{"1":"OFF","2":"OFF","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"W","16":"W","17":"W","18":"W","19":"OFF","20":"W","21":"W","22":"W","23":"W","24":"W","25":"W","26":"OFF","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"","name":"อารัว","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"OFF","5":"W","6":"W","7":"W","8":"W","9":"W","10":"OFF","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"OFF","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"OFF","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"5","name":"ติงติง","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"OFF","5":"W","6":"W","7":"W","8":"W","9":"W","10":"OFF","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"OFF","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"OFF","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"6","name":"น้องนิด","position":"พาสไทม์","type":"parttime","schedule":{"1":"W","2":"W","3":"OFF","4":"OFF","5":"OFF","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"OFF","20":"OFF","21":"OFF","22":"OFF","23":"OFF","24":"OFF","25":"OFF","26":"OFF","27":"OFF","28":"OFF","29":"OFF","30":"OFF","31":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"7","name":"น้องเปิ้ล","position":"พาสไทม์","type":"parttime","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"OFF","6":"W","7":"W","8":"W","9":"W","10":"W","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"OFF","20":"OFF","21":"OFF","22":"OFF","23":"OFF","24":"OFF","25":"OFF","26":"OFF","27":"OFF","28":"OFF","29":"OFF","30":"OFF","31":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"8","name":"น้องน้ำอิง","position":"ฝึกงาน","type":"intern","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"OFF","21":"W","22":"W","23":"W","24":"W","25":"W","26":"OFF","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"9","name":"น้องภาคภูมิ","position":"ฝึกงาน","type":"intern","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"OFF","20":"W","21":"W","22":"W","23":"W","24":"W","25":"OFF","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""}]},"2026-04":{"label":"เมษายน 2026","year":2026,"month":4,"days":30,"note":"เดือน เมษายน หยุด 4 วัน (วันที่ 6 วันจักรี, 13-14 วันสงกรานต์) — วันหยุดเพิ่ม 4 วัน","publicHolidays":[6,13,14,15],"groups":{},"employees":[{"no":"1","name":"ยายปิน","position":"","type":"regular","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"W","8":"OFF","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"W","20":"W","21":"OFF","22":"W","23":"W","24":"W","25":"W","26":"W","27":"W","28":"OFF","29":"W","30":"W"},"vacUsed":"4","phTotal":"6","phRemain":"2","remark":""},{"no":"2","name":"หลุยส์","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"OFF","19":"OFF","20":"OFF","21":"OFF","22":"HALF","23":"W","24":"W","25":"W","26":"W","27":"W","28":"OFF","29":"W","30":"W"},"vacUsed":"2.5","phTotal":"4","phRemain":"1.5","remark":""},{"no":"3","name":"พี่ทิพย์","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"OFF","4":"OFF","5":"W","6":"W","7":"OFF","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"OFF","15":"OFF","16":"W","17":"W","18":"W","19":"W","20":"OFF","21":"W","22":"W","23":"W","24":"W","25":"OFF","26":"W","27":"W","28":"OFF","29":"W","30":"W"},"vacUsed":"5","phTotal":"6","phRemain":"1","remark":""},{"no":"4","name":"สาม","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"OFF","20":"OFF","21":"OFF","22":"OFF","23":"OFF","24":"OFF","25":"OFF","26":"OFF","27":"OFF","28":"OFF","29":"OFF","30":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"5","name":"อารัว","position":"","type":"regular","schedule":{"1":"OFF","2":"OFF","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"W","26":"W","27":"W","28":"OFF","29":"W","30":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"6","name":"ติงติง","position":"","type":"regular","schedule":{"1":"OFF","2":"OFF","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"W","26":"W","27":"W","28":"OFF","29":"W","30":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"7","name":"น้องนิด","position":"พาสไทม์","type":"parttime","schedule":{"1":"OFF","2":"W","3":"W","4":"W","5":"W","6":"W","7":"OFF","8":"OFF","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"OFF","23":"W","24":"W","25":"W","26":"W","27":"W","28":"OFF","29":"W","30":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"8","name":"น้องเปิ้ล","position":"พาสไทม์","type":"parttime","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"OFF","7":"OFF","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"OFF","15":"W","16":"OFF","17":"W","18":"W","19":"W","20":"W","21":"OFF","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"OFF","28":"OFF","29":"W","30":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""}]},"2026-03":{"label":"มีนาคม 2026","year":2026,"month":3,"days":31,"note":"เดือน มีนาคม หยุด 1 วัน (วันที่ 3 วันมาฆบูชา) — วันหยุดเพิ่ม 1 วัน","publicHolidays":[3],"groups":{},"employees":[{"no":"1","name":"ยายปิน","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"OFF","4":"OFF","5":"W","6":"W","7":"W","8":"W","9":"W","10":"OFF","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"OFF"},"vacUsed":"1","phTotal":"3","phRemain":"2","remark":""},{"no":"2","name":"หลุยส์","position":"","type":"regular","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"HALF","10":"W","11":"W","12":"W","13":"HALF","14":"W","15":"W","16":"W","17":"W","18":"OFF","19":"OFF","20":"OFF","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"OFF"},"vacUsed":"2","phTotal":"2","phRemain":"0","remark":""},{"no":"3","name":"พี่นิล","position":"","type":"regular","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"OFF","10":"W","11":"W","12":"W","13":"W","14":"OFF","15":"W","16":"OFF","17":"W","18":"W","19":"W","20":"OFF","21":"W","22":"W","23":"OFF","24":"OFF","25":"W","26":"W","27":"W","28":"W","29":"W","30":"OFF","31":"OFF"},"vacUsed":"4","phTotal":"6","phRemain":"2","remark":""},{"no":"4","name":"พี่ทิพย์","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"OFF","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"OFF","11":"OFF","12":"W","13":"W","14":"W","15":"W","16":"W","17":"OFF","18":"W","19":"OFF","20":"W","21":"W","22":"W","23":"W","24":"OFF","25":"OFF","26":"W","27":"W","28":"W","29":"W","30":"W","31":"OFF"},"vacUsed":"3","phTotal":"5","phRemain":"2","remark":""},{"no":"5","name":"สาม","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"OFF","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"OFF","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"6","name":"น้องนิด","position":"พาสไทม์","type":"parttime","schedule":{"1":"W","2":"W","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"W","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"W","13":"W","14":"W","15":"W","16":"W","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W","29":"W","30":"OFF","31":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"7","name":"น้องเปิ้ล","position":"พาสไทม์","type":"parttime","schedule":{"1":"W","2":"W","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"W","8":"W","9":"W","10":"OFF","11":"OFF","12":"W","13":"W","14":"W","15":"W","16":"W","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""}]},"2026-02":{"label":"กุมภาพันธ์ 2026","year":2026,"month":2,"days":28,"note":"กุมภาพันธ์ — ไม่มีวันหยุดเพิ่ม","publicHolidays":[],"groups":{},"employees":[{"no":"1","name":"ยายปิน","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"OFF","4":"W","5":"W","6":"W","7":"OFF","8":"W","9":"W","10":"OFF","11":"W","12":"W","13":"W","14":"W","15":"W","16":"OFF","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W"},"vacUsed":"1","phTotal":"3","phRemain":"2","remark":""},{"no":"2","name":"หลุยส์","position":"","type":"regular","schedule":{"1":"OFF","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"OFF","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"HALF","21":"OFF","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W"},"vacUsed":"1.5","phTotal":"2.5","phRemain":"1","remark":""},{"no":"3","name":"พี่นิล","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"OFF","4":"W","5":"W","6":"W","7":"W","8":"W","9":"OFF","10":"W","11":"W","12":"OFF","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"OFF","20":"W","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W"},"vacUsed":"1","phTotal":"6","phRemain":"5","remark":""},{"no":"4","name":"พี่ทิพย์","position":"","type":"regular","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"OFF","8":"W","9":"W","10":"W","11":"OFF","12":"W","13":"OFF","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"OFF","21":"W","22":"W","23":"W","24":"OFF","25":"W","26":"W","27":"W","28":"W"},"vacUsed":"2","phTotal":"6","phRemain":"4","remark":""},{"no":"5","name":"อ้ายสีนน","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"W","26":"W","27":"W","28":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"6","name":"สาม","position":"","type":"regular","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"OFF","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"OFF","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"W","24":"W","25":"W","26":"W","27":"W","28":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"7","name":"น้องน้ำ","position":"ฝึกงาน","type":"intern","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"OFF","8":"OFF","9":"W","10":"OFF","11":"W","12":"W","13":"W","14":"HALF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"OFF","20":"OFF","21":"OFF","22":"OFF","23":"OFF","24":"OFF","25":"OFF","26":"OFF","27":"OFF","28":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"8","name":"น้องนิด","position":"พาสไทม์","type":"parttime","schedule":{"1":"W","2":"OFF","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"OFF","20":"OFF","21":"W","22":"W","23":"W","24":"OFF","25":"OFF","26":"W","27":"W","28":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"9","name":"น้องฟ้า","position":"พาสไทม์","type":"parttime","schedule":{"1":"OFF","2":"OFF","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"W","16":"W","17":"W","18":"W","19":"OFF","20":"OFF","21":"W","22":"W","23":"W","24":"OFF","25":"OFF","26":"W","27":"W","28":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""}]},"2026-01":{"label":"มกราคม 2026","year":2026,"month":1,"days":31,"note":"เดือน มกราคม หยุด 1 วัน (วันที่ 1 วันปีใหม่) — วันหยุดเพิ่ม 1 วัน","publicHolidays":[1],"groups":{},"employees":[{"no":"1","name":"ยายปิน","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"OFF","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"OFF","23":"W","24":"W","25":"W","26":"OFF","27":"OFF","28":"W","29":"W","30":"OFF","31":"W"},"vacUsed":"3","phTotal":"6","phRemain":"3","remark":""},{"no":"2","name":"หลุยส์","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"W","12":"OFF","13":"W","14":"W","15":"W","16":"OFF","17":"W","18":"W","19":"HALF","20":"OFF","21":"OFF","22":"OFF","23":"W","24":"W","25":"W","26":"W","27":"OFF","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"3.5","phTotal":"5.5","phRemain":"2","remark":""},{"no":"3","name":"พี่นิล","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"OFF","15":"W","16":"W","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"OFF","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"1","phTotal":"6","phRemain":"5","remark":""},{"no":"4","name":"พี่ทิพย์","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"OFF","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"W","15":"W","16":"W","17":"W","18":"W","19":"W","20":"OFF","21":"W","22":"W","23":"W","24":"W","25":"W","26":"W","27":"OFF","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"6","phRemain":"6","remark":""},{"no":"5","name":"อ้ายสีนน","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"OFF","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"OFF","13":"W","14":"W","15":"W","16":"W","17":"W","18":"W","19":"OFF","20":"W","21":"W","22":"W","23":"W","24":"W","25":"W","26":"OFF","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"6","name":"สาม","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"W","4":"W","5":"W","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"OFF","15":"W","16":"W","17":"W","18":"W","19":"W","20":"OFF","21":"W","22":"W","23":"W","24":"W","25":"W","26":"W","27":"OFF","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"7","name":"น้องน้ำ","position":"ฝึกงาน","type":"intern","schedule":{"1":"W","2":"OFF","3":"OFF","4":"HALF","5":"OFF","6":"OFF","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"OFF","14":"W","15":"W","16":"HALF","17":"OFF","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"OFF","27":"OFF","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"8","name":"น้องนิด","position":"พาสไทม์","type":"parttime","schedule":{"1":"OFF","2":"W","3":"W","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"OFF","14":"OFF","15":"OFF","16":"W","17":"HALF","18":"OFF","19":"OFF","20":"OFF","21":"OFF","22":"OFF","23":"OFF","24":"OFF","25":"OFF","26":"OFF","27":"OFF","28":"OFF","29":"OFF","30":"OFF","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""}]},"2025-12":{"label":"ธันวาคม 2025","year":2025,"month":12,"days":31,"note":"เดือน ธันวาคม หยุด 3 วัน (วันที่ 5, 10, 31) — วันหยุดเพิ่ม 3 วัน","publicHolidays":[5,10,31],"groups":{},"employees":[{"no":"1","name":"ยายปิน","position":"","type":"regular","schedule":{"1":"OFF","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"OFF","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"5","phRemain":"5","remark":"เพิ่มวันหยุดสะสมให้ 1 วัน"},{"no":"2","name":"หลุยส์","position":"","type":"regular","schedule":{"1":"OFF","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"OFF","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"OFF","23":"W","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"4.5","phRemain":"4.5","remark":"เพิ่มวันหยุดสะสมให้ 2 วัน"},{"no":"3","name":"พี่นิล","position":"","type":"regular","schedule":{"1":"W","2":"W","3":"OFF","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"OFF","15":"W","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"5","phRemain":"5","remark":""},{"no":"4","name":"พี่ทิพย์","position":"","type":"regular","schedule":{"1":"OFF","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"OFF","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"OFF","23":"W","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"5","phRemain":"5","remark":""},{"no":"5","name":"อ้ายสีนน","position":"","type":"regular","schedule":{"1":"OFF","2":"W","3":"W","4":"W","5":"W","6":"W","7":"W","8":"OFF","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"OFF","16":"W","17":"W","18":"W","19":"W","20":"W","21":"W","22":"OFF","23":"W","24":"W","25":"W","26":"W","27":"OFF","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"6","name":"สาม","position":"","type":"regular","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"W","6":"W","7":"W","8":"W","9":"W","10":"W","11":"OFF","12":"W","13":"W","14":"W","15":"W","16":"OFF","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"7","name":"น้องน้ำ","position":"ฝึกงาน","type":"intern","schedule":{"1":"W","2":"OFF","3":"W","4":"W","5":"OFF","6":"W","7":"W","8":"W","9":"W","10":"W","11":"W","12":"W","13":"W","14":"W","15":"W","16":"OFF","17":"W","18":"W","19":"W","20":"W","21":"W","22":"W","23":"OFF","24":"W","25":"W","26":"W","27":"W","28":"W","29":"W","30":"W","31":"W"},"vacUsed":"","phTotal":"","phRemain":"","remark":""},{"no":"8","name":"น้องนิด","position":"พาสไทม์","type":"parttime","schedule":{"1":"OFF","2":"OFF","3":"OFF","4":"OFF","5":"OFF","6":"OFF","7":"OFF","8":"OFF","9":"OFF","10":"OFF","11":"OFF","12":"OFF","13":"W","14":"W","15":"OFF","16":"OFF","17":"OFF","18":"OFF","19":"OFF","20":"W","21":"W","22":"OFF","23":"OFF","24":"OFF","25":"OFF","26":"OFF","27":"W","28":"W","29":"W","30":"W","31":"OFF"},"vacUsed":"","phTotal":"","phRemain":"","remark":""}]}};
+
+// ═══════════════════ STATE ═══════════════════
+let data = {}, curKey = '', curView = 'schedule';
+const LSK = 'kw_sched_v4';
+
+const clone = o => JSON.parse(JSON.stringify(o));
+const sorted = () => Object.keys(data).sort();
+const saveLocal = () => localStorage.setItem(LSK, JSON.stringify(data));
+const dow = (y,m,d) => new Date(y,m-1,d).getDay();
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const beYear = y => y + 543;
+const beYearShort = y => String(y+543).slice(-2);
+
+// ═══════════════════ INIT ═══════════════════
+async function init(){
+  const saved = localStorage.getItem(LSK);
+  data = saved ? (()=>{try{return JSON.parse(saved);}catch{return clone(EXCEL);}})() : clone(EXCEL);
+  ensurePositionField(data);
+  const ks = sorted();
+  curKey = ks[ks.length-1] || '2026-05';
+  setupEvents();
+  render();
+  await syncFromCloud();
+}
+
+function ensurePositionField(d){
+  Object.values(d).forEach(m=>{
+    (m.employees||[]).forEach(e=>{ if(e.position===undefined) e.position=''; });
+  });
+}
+
+async function syncFromCloud(){
+  setSync('syncing');
+  try{
+    const rows = await cloudList();
+    if(!rows.length){
+      for(const k of Object.keys(data)) await cloudUpsert(k, data[k]);
+    }else{
+      const cloudData = {};
+      rows.forEach(r => cloudData[r.key] = r.data);
+      ensurePositionField(cloudData);
+      data = cloudData;
+      saveLocal();
+      const ks = sorted();
+      if(!data[curKey]) curKey = ks[ks.length-1] || curKey;
+      render();
+    }
+    setSync('ok');
+  }catch(e){ console.error('sync',e); setSync('error'); }
+}
+
+function setupEvents(){
+  document.querySelectorAll('.nb').forEach(b => b.onclick = () => switchView(b.dataset.v));
+  document.getElementById('fab').onclick = ()=>showAddEmpModal();
+  document.getElementById('modal-cl').onclick = closeModal;
+  document.getElementById('modal-ov').onclick = e => { if(e.target===document.getElementById('modal-ov')) closeModal(); };
+  document.getElementById('btn-save').onclick = pushAllNow;
+  document.getElementById('btn-png').onclick = exportPNG;
+  document.getElementById('btn-pdf').onclick = exportPDF;
+}
+
+function switchView(v){
+  curView = v;
+  ['schedule','summary','manage'].forEach(n => document.getElementById(n+'-view').classList.toggle('hidden', n!==v));
+  document.querySelectorAll('.nb').forEach(b => b.classList.toggle('active', b.dataset.v===v));
+  document.getElementById('fab').classList.toggle('hidden', v!=='schedule');
+  if(v==='summary') renderSummary();
+  if(v==='manage') renderManage();
+}
+
+// ═══════════════════ RENDER ═══════════════════
+function render(){
+  const m = data[curKey]; if(!m) return;
+  const nb = document.getElementById('note-bar');
+  if(m.note){ nb.textContent=m.note; nb.style.display='block'; } else nb.style.display='none';
+  renderSchedule();
+  renderTabs();
+}
+
+function renderTabs(){
+  const ks = sorted();
+  const wrap = document.getElementById('month-tabs');
+  let html = '';
+  ks.forEach(k=>{
+    const m = data[k];
+    const txt = `ตารางงาน ${MONTH_TH_SHORT[m.month]} ${beYearShort(m.year)}`;
+    html += `<button class="mtab${k===curKey?' active':''}" onclick="selectMonth('${k}')">${txt}</button>`;
+  });
+  html += `<button class="mtab-add" onclick="addNextMonth()" title="เพิ่มเดือนถัดไป">+</button>`;
+  wrap.innerHTML = html;
+  setTimeout(()=>{
+    const a = wrap.querySelector('.mtab.active');
+    if(a) a.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});
+  },50);
+}
+
+function renderSchedule(){
+  const m = data[curKey]; if(!m) return;
+  const ph = new Set(m.publicHolidays||[]);
+  const totalCols = 2 + m.days + 5 + 1;
+  const enMonth = MONTH_EN[m.month]||'';
+
+  const titleHTML = `<tr class="title-row"><td colspan="${totalCols}">
+    <span>Kornwat Garden Resort &nbsp;&nbsp; Schedule of ${enMonth} ${m.year}</span>
+    <span class="sub">ตารางการทำงานพนักงาน เดือน ${MONTH_TH[m.month]} ${beYear(m.year)}</span></td></tr>`;
+
+  let h1 = `<tr class="hdr1">
+    <th class="nc" style="min-width:30px;max-width:30px;text-align:center!important;">No.</th>
+    <th class="nc" style="min-width:108px;max-width:108px;">Name</th>`;
+  for(let d=1;d<=m.days;d++){
+    const w=dow(m.year,m.month,d), wk=w===0||w===6;
+    h1+=`<th class="${wk?'wknd':''}" style="min-width:26px;width:26px;">${d}</th>`;
+  }
+  h1+=`<th class="sub-hd" colspan="2">Day type</th>
+       <th class="sub-hd">ใช้วันหยุด</th>
+       <th class="sub-hd" colspan="2">วันหยุดนักขัตฤกษ์ (วัน)</th>
+       <th class="sub-hd" style="min-width:90px;">Remark / หมายเหตุ</th></tr>`;
+
+  let h2 = `<tr class="hdr2">
+    <th class="nc" style="min-width:30px;max-width:30px;"></th>
+    <th class="nc" style="min-width:108px;max-width:108px;font-size:10px;">Day type</th>`;
+  for(let d=1;d<=m.days;d++){
+    const w=dow(m.year,m.month,d), wk=w===0||w===6;
+    h2+=`<th class="${wk?'wknd':''}">${DAY_TH[w]}</th>`;
+  }
+  h2+=`<th class="sub-hd sub-hd-sm">work</th>
+       <th class="sub-hd sub-hd-sm">Day off</th>
+       <th class="sub-hd sub-hd-sm">ใช้</th>
+       <th class="sub-hd sub-hd-sm">ที่มี</th>
+       <th class="sub-hd sub-hd-sm">คงเหลือ</th>
+       <th class="sub-hd"></th></tr>`;
+
+  document.getElementById('tbl-head').innerHTML = titleHTML + h1 + h2;
+
+  let body = '';
+  m.employees.forEach((emp, ei) => {
+    if(!emp.name){
+      body+=`<tr style="height:28px;"><td class="nc-body" style="min-width:30px;max-width:30px;"></td><td class="nc-body" style="min-width:108px;max-width:108px;"></td>${'<td style="background:#fffdf5;"></td>'.repeat(m.days+5+1)}</tr>`;
+      return;
+    }
+    let wk=0,of=0;
+    let cells='';
+    for(let d=1;d<=m.days;d++){
+      const s=(emp.schedule&&emp.schedule[d])||'W';
+      const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
+      if(s==='W') wk++; else if(s==='OFF') of++; else if(s==='HALF') wk+=.5;
+      const lbl = s==='OFF'?'OFF': s==='HALF'?'½':'';
+      cells+=`<td class="dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}" onclick="tap(${ei},${d})">${lbl}</td>`;
+    }
+    const pos = emp.position||'';
+    body+=`<tr class="emp-row" data-ei="${ei}">
+      <td class="nc-body emp-no-cell" style="min-width:30px;max-width:30px;">${esc(emp.no||'')}</td>
+      <td class="nc-body" style="min-width:108px;max-width:108px;" onclick="editEmpName(${ei})">
+        <span class="emp-name">${esc(emp.name)}</span>
+        ${pos?`<span class="emp-pos">${esc(pos)}</span>`:''}
+      </td>
+      ${cells}
+      <td class="sc wk" id="wk-${ei}">${wk}</td>
+      <td class="sc of" id="of-${ei}">${of}</td>
+      <td class="sc vc">${esc(emp.vacUsed||'')}</td>
+      <td class="sc ph">${esc(emp.phTotal||'')}</td>
+      <td class="sc ph">${esc(emp.phRemain||'')}</td>
+      <td class="rc" onclick="editRemark(${ei})" title="แตะเพื่อแก้ไข">${esc(emp.remark||'')||'<span style="color:#ccc;">—</span>'}</td>
+    </tr>`;
+  });
+  document.getElementById('tbl-body').innerHTML = body;
+
+  // Footer ชื่อ กรุ๊ป
+  const grps = m.groups||{};
+  let grpCells='';
+  for(let d=1;d<=m.days;d++){
+    const g=grps[d]||'';
+    grpCells+=`<td class="grp-cell${g?' has-grp':''}" onclick="editGroup(${d})">${esc(g)}</td>`;
+  }
+  const regs=m.employees.filter(e=>e.name&&e.type==='regular');
+  let avgWk='',avgOf='';
+  if(regs.length){
+    let tw=0,to=0;
+    regs.forEach(e=>{let w=0,o=0;for(let d=1;d<=m.days;d++){const s=(e.schedule&&e.schedule[d])||'W';if(s==='W')w++;else if(s==='OFF')o++;else if(s==='HALF')w+=.5;}tw+=w;to+=o;});
+    avgWk=Math.round(tw/regs.length); avgOf=Math.round(to/regs.length);
+  }
+  document.getElementById('tbl-foot').innerHTML=`<tr class="grp-row">
+    <td class="nc-body" style="min-width:30px;max-width:30px;background:#fde8d8;"></td>
+    <td class="nc-body" style="min-width:108px;max-width:108px;background:#fde8d8;color:#8b4513;font-weight:700;font-size:11px;">ชื่อ กรุ๊ป</td>
+    ${grpCells}
+    <td class="sc wk" style="background:#fef3e2;writing-mode:initial;">${avgWk}</td>
+    <td class="sc of" style="background:#fef3e2;writing-mode:initial;">${avgOf}</td>
+    <td colspan="3" style="background:#fef3e2;font-size:10px;color:#8b4513;text-align:left;padding:3px 5px;">${esc(m.note||'')}</td>
+    <td class="rc" style="background:#fef3e2;font-size:10px;color:#d97706;font-weight:700;">วันหยุดเพิ่ม</td>
+  </tr>`;
+}
+
+// ═══════════════════ INTERACTIONS ═══════════════════
+function tap(ei,d){
+  const m=data[curKey]; if(!m) return;
+  const emp=m.employees[ei]; if(!emp) return;
+  if(!emp.schedule) emp.schedule={};
+  emp.schedule[d]=CYCLE[emp.schedule[d]||'W']||'W';
+  saveLocal(); schedulePush(curKey);
+  const ph=new Set(m.publicHolidays||[]);
+  const s=emp.schedule[d];
+  const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
+  const cell=document.querySelector(`tr[data-ei="${ei}"] td.dc[onclick="tap(${ei},${d})"]`);
+  if(cell){
+    cell.className=`dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}`;
+    cell.textContent=s==='OFF'?'OFF':s==='HALF'?'½':'';
+  }
+  updateRowTotals(ei);
+}
+
+function updateRowTotals(ei){
+  const m=data[curKey]; const emp=m.employees[ei]; if(!emp) return;
+  let wk=0,of=0;
+  for(let d=1;d<=m.days;d++){
+    const s=(emp.schedule&&emp.schedule[d])||'W';
+    if(s==='W')wk++;else if(s==='OFF')of++;else if(s==='HALF')wk+=.5;
+  }
+  const wEl=document.getElementById(`wk-${ei}`), oEl=document.getElementById(`of-${ei}`);
+  if(wEl) wEl.textContent=wk;
+  if(oEl) oEl.textContent=of;
+}
+
+function editEmpName(ei){
+  const e=data[curKey].employees[ei]; if(!e||!e.name) return;
+  openModal('แก้ไข ชื่อ / ตำแหน่ง',
+    `<div class="fg"><label>ชื่อพนักงาน *</label><input type="text" id="en-name" value="${esc(e.name)}" maxlength="50"></div>
+     <div class="fg"><label>ตำแหน่ง</label><input type="text" id="en-pos" value="${esc(e.position||'')}" placeholder="เช่น แม่บ้าน, รปภ, เชฟ" maxlength="40"></div>
+     <div class="fr">
+       <div class="fg"><label>เลขที่ (No.)</label><input type="text" id="en-no" value="${esc(e.no||'')}" maxlength="5"></div>
+       <div class="fg"><label>ประเภท</label><select id="en-type">
+         <option value="regular" ${e.type==='regular'?'selected':''}>ประจำ</option>
+         <option value="parttime" ${e.type==='parttime'?'selected':''}>พาสไทม์</option>
+         <option value="intern" ${e.type==='intern'?'selected':''}>ฝึกงาน</option></select></div>
+     </div>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveEmpName(${ei})">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('en-name').focus(),100);
+}
+function saveEmpName(ei){
+  const name = document.getElementById('en-name').value.trim();
+  if(!name){ alert('ใส่ชื่อก่อน'); return; }
+  const e = data[curKey].employees[ei];
+  e.name = name;
+  e.position = document.getElementById('en-pos').value.trim();
+  e.no = document.getElementById('en-no').value.trim();
+  e.type = document.getElementById('en-type').value;
+  saveLocal(); schedulePush(curKey); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+function editGroup(d){
+  const m=data[curKey]; if(!m) return;
+  if(!m.groups) m.groups={};
+  const cur=m.groups[d]||'';
+  openModal('ชื่อ กรุ๊ป — วันที่ '+d,
+    `<div class="fg"><label>ชื่อกรุ๊ป/ทัวร์ วันที่ ${d}</label>
+     <input type="text" id="grp-inp" value="${esc(cur)}" placeholder="เช่น กรุ๊ป พี่แคท" maxlength="30"></div>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveGroup(${d})">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('grp-inp').focus(),100);
+}
+function saveGroup(d){
+  const v=document.getElementById('grp-inp').value.trim();
+  if(!data[curKey].groups) data[curKey].groups={};
+  if(v) data[curKey].groups[d]=v; else delete data[curKey].groups[d];
+  saveLocal(); schedulePush(curKey); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+function editRemark(ei){
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  openModal('หมายเหตุ — '+emp.name,
+    `<div class="fg"><label>หมายเหตุ</label>
+     <textarea id="rem-inp" maxlength="100">${esc(emp.remark||'')}</textarea></div>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveRemark(${ei})">บันทึก</button>`);
+}
+function saveRemark(ei){
+  data[curKey].employees[ei].remark=document.getElementById('rem-inp').value.trim();
+  saveLocal(); schedulePush(curKey); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ═══════════════════ TAB ACTIONS ═══════════════════
+function selectMonth(k){ curKey=k; render(); if(curView==='manage') renderManage(); }
+
+function addNextMonth(){
+  const ks=sorted();
+  const last = ks[ks.length-1];
+  let y, mo;
+  if(last){
+    const lm = data[last];
+    y = lm.year; mo = lm.month+1;
+    if(mo>12){ mo=1; y++; }
+  }else{
+    const n=new Date(); y=n.getFullYear(); mo=n.getMonth()+1;
+  }
+  const key=`${y}-${String(mo).padStart(2,'0')}`;
+  if(data[key]){ showToast('มีเดือนนี้แล้ว'); curKey=key; render(); return; }
+  const days=new Date(y,mo,0).getDate();
+  const emps = (last && data[last].employees||[]).filter(e=>e.name).map(e=>{
+    const s={}; for(let d=1;d<=days;d++) s[d]='W';
+    return {no:e.no||'',name:e.name,position:e.position||'',type:e.type,schedule:s,vacUsed:'',phTotal:'',phRemain:e.phRemain||'',remark:''};
+  });
+  data[key]={label:`${MONTH_TH[mo]} ${y}`,year:y,month:mo,days,note:'',publicHolidays:[],groups:{},employees:emps};
+  curKey=key; saveLocal(); schedulePush(key); render(); showToast('สร้างเดือน '+MONTH_TH[mo]+' '+beYear(y)+' แล้ว');
+}
+
+// ═══════════════════ SUMMARY ═══════════════════
+function renderSummary(){
+  const m=data[curKey]; if(!m) return;
+  let html=`<div class="sum-card">
+    <div class="sum-card-hd">📊 สรุปประจำเดือน ${m.label}</div>
+    <table class="sum-tbl"><thead><tr>
+      <th style="text-align:left;">ชื่อพนักงาน</th>
+      <th>ทำงาน</th><th>OFF</th><th>ครึ่ง</th>
+      <th>ใช้</th><th>ที่มี</th><th>คงเหลือ</th>
+    </tr></thead><tbody>`;
+  m.employees.forEach(emp=>{
+    if(!emp.name) return;
+    let wk=0,of=0,hf=0;
+    for(let d=1;d<=m.days;d++){
+      const s=(emp.schedule&&emp.schedule[d])||'W';
+      if(s==='W')wk++;else if(s==='OFF')of++;else if(s==='HALF'){wk+=.5;hf++;}
+    }
+    html+=`<tr>
+      <td><span style="color:#e07b54;font-weight:700;">${esc(emp.name)}</span>${emp.position?`<br><span style="font-size:9px;color:#888;">${esc(emp.position)}</span>`:''}<br>
+        <span class="badge ${BADGE_CLS[emp.type]||'b-reg'}">${TYPE_LBL[emp.type]||''}</span></td>
+      <td style="color:#2e7d32;font-weight:700;">${wk}</td>
+      <td style="color:#c0392b;font-weight:700;">${of}</td>
+      <td style="color:#d97706;">${hf||'-'}</td>
+      <td style="color:#1565c0;">${emp.vacUsed||'-'}</td>
+      <td style="color:#6a1b9a;">${emp.phTotal||'-'}</td>
+      <td style="color:#6a1b9a;font-weight:700;">${emp.phRemain||'-'}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  const total=m.employees.filter(e=>e.name).length;
+  const regs=m.employees.filter(e=>e.name&&e.type==='regular').length;
+  const others=total-regs;
+  html+=`<div class="sum-card"><div class="sum-card-hd">📈 ภาพรวม ${m.label}</div>
+    <div style="padding:12px;display:flex;gap:10px;flex-wrap:wrap;text-align:center;">
+      <div style="flex:1;min-width:70px;"><div style="font-size:26px;font-weight:700;color:#e07b54;">${total}</div><div style="font-size:10px;color:#888;">พนักงานทั้งหมด</div></div>
+      <div style="flex:1;min-width:70px;"><div style="font-size:26px;font-weight:700;color:#2e7d32;">${regs}</div><div style="font-size:10px;color:#888;">พนักงานประจำ</div></div>
+      <div style="flex:1;min-width:70px;"><div style="font-size:26px;font-weight:700;color:#1565c0;">${others}</div><div style="font-size:10px;color:#888;">พาสไทม์/ฝึกงาน</div></div>
+    </div>
+    <div style="padding:0 12px 12px;font-size:11px;color:#8b4513;">${esc(m.note||'')}</div>
+  </div>`;
+  document.getElementById('summary-view').innerHTML = html;
+}
+
+// ═══════════════════ MANAGE ═══════════════════
+function renderManage(){
+  const m=data[curKey]; const keys=sorted();
+  let html=`<div class="mg-sec">
+    <div class="mg-hd"><span>📅 รายการเดือน</span>
+      <button class="btn-sm btn-add" onclick="addNextMonth()">+ เดือนถัดไป</button></div>
+    <div class="mg-body">`;
+  keys.forEach(k=>{
+    const d=data[k], active=k===curKey;
+    html+=`<div class="mg-item">
+      <div><strong style="font-size:12px;${active?'color:#e07b54;':''}">${d.label}</strong>
+        <span style="font-size:10px;color:#888;display:block;">${d.employees.filter(e=>e.name).length} คน · ${d.days} วัน</span></div>
+      <div style="display:flex;gap:5px;">
+        ${active?'<span style="font-size:10px;color:#e07b54;font-weight:700;">● กำลังดู</span>':`<button class="btn-sm btn-edit" onclick="selectMonth('${k}')">เลือก</button>`}
+        <button class="btn-sm btn-del" onclick="delMonth('${k}')">ลบ</button>
+      </div></div>`;
+  });
+  html+=`</div></div>`;
+
+  if(m){
+    html+=`<div class="mg-sec">
+      <div class="mg-hd"><span>👥 พนักงาน ${m.label}</span>
+        <button class="btn-sm btn-add" onclick="showAddEmpModal()">+ เพิ่ม</button></div>
+      <div class="mg-body">`;
+    m.employees.forEach((emp,ei)=>{
+      if(!emp.name) return;
+      html+=`<div class="mg-item">
+        <div><strong style="font-size:12px;color:#e07b54;">${esc(emp.name)}</strong>
+          ${emp.position?`<span style="font-size:10px;color:#666;display:block;">${esc(emp.position)}</span>`:''}
+          <span class="badge ${BADGE_CLS[emp.type]}" style="font-size:9px;">${TYPE_LBL[emp.type]||''}</span></div>
+        <div style="display:flex;gap:5px;">
+          <button class="btn-sm btn-edit" onclick="editEmpName(${ei})">แก้ไข</button>
+          <button class="btn-sm btn-del" onclick="delEmp(${ei})">ลบ</button>
+        </div></div>`;
+    });
+    html+=`</div></div>`;
+
+    html+=`<div class="mg-sec">
+      <div class="mg-hd">⭐ วันหยุดนักขัตฤกษ์ ${m.label}</div>
+      <div class="mg-body">
+        <p style="font-size:12px;color:#8b4513;margin-bottom:8px;">วันที่: <strong>${(m.publicHolidays||[]).join(', ')||'ไม่มี'}</strong></p>
+        <p style="font-size:11px;color:#888;margin-bottom:8px;">${esc(m.note||'')}</p>
+        <button class="btn-pri" onclick="showEditHolidayModal()" style="font-size:12px;padding:7px 14px;">แก้ไขวันหยุด</button>
+      </div></div>`;
+
+    html+=`<div class="mg-sec">
+      <div class="mg-hd">☁️ ข้อมูลคลาวด์</div>
+      <div class="mg-body">
+        <p style="font-size:11px;color:#888;margin-bottom:8px;">ข้อมูลซิงค์อัตโนมัติกับ Supabase</p>
+        <button class="btn-pri" onclick="pushAllNow()" style="font-size:12px;padding:7px 14px;margin-right:6px;">💾 บันทึกทั้งหมด</button>
+        <button class="btn-sec" onclick="syncFromCloud().then(()=>{render();renderManage();showToast('โหลดล่าสุดแล้ว');})" style="font-size:12px;padding:7px 14px;margin-right:6px;">🔄 โหลดล่าสุด</button>
+        <br><br>
+        <button class="btn-sec" onclick="resetAll()" style="font-size:11px;padding:6px 12px;background:#ffebee;color:#c62828;">🔄 รีเซ็ตจาก Excel</button>
+      </div></div>`;
+  }
+  document.getElementById('manage-view').innerHTML = html;
+}
+
+async function delMonth(k){
+  if(!confirm(`ลบเดือน "${data[k].label}"?`)) return;
+  delete data[k];
+  saveLocal();
+  try{ await cloudDelete(k); }catch(e){ console.error(e); }
+  const ks=sorted(); if(ks.length) curKey=ks[ks.length-1];
+  render(); renderManage(); showToast('ลบแล้ว');
+}
+function delEmp(ei){
+  const e=data[curKey].employees[ei];
+  if(!confirm(`ลบ "${e.name}"?`)) return;
+  data[curKey].employees.splice(ei,1);
+  saveLocal(); schedulePush(curKey); render(); renderManage(); showToast('ลบพนักงานแล้ว');
+}
+async function resetAll(){
+  if(!confirm('รีเซ็ตข้อมูลทั้งหมด? การแก้ไขจะหายไป')) return;
+  data=clone(EXCEL); ensurePositionField(data);
+  saveLocal();
+  await pushAllNow();
+  render(); renderManage();
+}
+
+// ═══════════════════ MODALS ═══════════════════
+function openModal(title,body,footer){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-bd').innerHTML=body;
+  document.getElementById('modal-ft').innerHTML=footer;
+  document.getElementById('modal-ov').classList.remove('hidden');
+}
+function closeModal(){ document.getElementById('modal-ov').classList.add('hidden'); }
+
+function showAddEmpModal(){
+  openModal('เพิ่มพนักงาน',
+    `<div class="fg"><label>ชื่อพนักงาน *</label><input type="text" id="np-name" maxlength="50" placeholder="ชื่อ"></div>
+     <div class="fg"><label>ตำแหน่ง</label><input type="text" id="np-pos" placeholder="เช่น แม่บ้าน, รปภ, เชฟ" maxlength="40"></div>
+     <div class="fr"><div class="fg"><label>ประเภท</label><select id="np-type">
+       <option value="regular">ประจำ</option>
+       <option value="parttime">พาสไทม์</option>
+       <option value="intern">ฝึกงาน</option></select></div>
+     <div class="fg"><label>เลขที่</label><input type="text" id="np-no" maxlength="5" placeholder="ว่างได้"></div></div>
+     <div class="fr"><div class="fg"><label>วันหยุดคงเหลือ</label><input type="number" id="np-ph" min="0" max="30" step="0.5" placeholder="0"></div>
+     <div class="fg"><label>สถานะเริ่มต้น</label><select id="np-def">
+       <option value="W">ทำงานทุกวัน</option>
+       <option value="OFF">หยุดทุกวัน</option></select></div></div>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="addEmp()">เพิ่ม</button>`);
+  setTimeout(()=>document.getElementById('np-name').focus(),100);
+}
+function addEmp(){
+  const name=document.getElementById('np-name').value.trim(); if(!name){alert('ใส่ชื่อก่อน');return;}
+  const m=data[curKey]; const sched={};
+  const def=document.getElementById('np-def').value;
+  for(let d=1;d<=m.days;d++) sched[d]=def;
+  m.employees.push({
+    no:document.getElementById('np-no').value.trim(),
+    name, position:document.getElementById('np-pos').value.trim(),
+    type:document.getElementById('np-type').value,
+    schedule:sched,vacUsed:'',phTotal:'',
+    phRemain:document.getElementById('np-ph').value||'0',remark:''
+  });
+  saveLocal(); schedulePush(curKey); closeModal(); render(); if(curView==='manage') renderManage(); showToast('เพิ่มแล้ว');
+}
+
+function showEditHolidayModal(){
+  const m=data[curKey];
+  openModal('วันหยุดนักขัตฤกษ์',
+    `<div class="fg"><label>วันที่หยุด (คั่นจุลภาค)</label>
+       <input type="text" id="eh-ph" value="${(m.publicHolidays||[]).join(', ')}" placeholder="เช่น 1,5,12"></div>
+     <div class="fg"><label>หมายเหตุ</label>
+       <input type="text" id="eh-note" value="${esc(m.note||'')}"></div>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveHoliday()">บันทึก</button>`);
+}
+function saveHoliday(){
+  const phStr=document.getElementById('eh-ph').value.trim();
+  data[curKey].publicHolidays=phStr?phStr.split(',').map(s=>+s.trim()).filter(n=>n&&!isNaN(n)):[];
+  data[curKey].note=document.getElementById('eh-note').value.trim();
+  saveLocal(); schedulePush(curKey); closeModal(); render(); renderManage(); showToast('บันทึกแล้ว');
+}
+
+// ═══════════════════ EXPORT ═══════════════════
+async function captureTable(){
+  const frame = document.getElementById('tbl-frame');
+  if(typeof html2canvas==='undefined'){ alert('html2canvas ไม่พร้อม — เช็คเน็ตและรีโหลด'); return null; }
+  showToast('⏳ กำลังสร้างรูป...');
+  const canvas = await html2canvas(frame, {
+    backgroundColor:'#fffdf5',
+    scale: 2,
+    useCORS:true,
+    windowWidth: frame.scrollWidth,
+    windowHeight: frame.scrollHeight,
+  });
+  return canvas;
+}
+async function exportPNG(){
+  try{
+    const canvas = await captureTable(); if(!canvas) return;
+    canvas.toBlob(blob=>{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download=`ตารางพนักงาน-${data[curKey].label}.png`;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+      showToast('📷 บันทึกรูปแล้ว');
+    },'image/png');
+  }catch(e){ console.error(e); showToast('⚠ บันทึกรูปไม่สำเร็จ'); }
+}
+async function exportPDF(){
+  try{
+    const canvas = await captureTable(); if(!canvas) return;
+    if(typeof jspdf==='undefined' && typeof window.jspdf==='undefined'){ alert('jspdf ไม่พร้อม'); return; }
+    const {jsPDF} = window.jspdf;
+    const imgData = canvas.toDataURL('image/png');
+    const w = canvas.width, h = canvas.height;
+    const orient = w>h?'landscape':'portrait';
+    const pdf = new jsPDF({orientation:orient, unit:'pt', format:'a4'});
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const scale = Math.min(pageW/w, pageH/h);
+    const drawW = w*scale, drawH = h*scale;
+    const x = (pageW-drawW)/2, y = (pageH-drawH)/2;
+    pdf.addImage(imgData,'PNG',x,y,drawW,drawH);
+    pdf.save(`ตารางพนักงาน-${data[curKey].label}.pdf`);
+    showToast('📄 บันทึก PDF แล้ว');
+  }catch(e){ console.error(e); showToast('⚠ บันทึก PDF ไม่สำเร็จ'); }
+}
+
+// ═══════════════════ TOAST ═══════════════════
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.remove('h');
+  setTimeout(()=>t.classList.add('h'),2200);
+}
+
+init();
+</script>
+</body>
+</html>
