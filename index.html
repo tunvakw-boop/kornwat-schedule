@@ -59,9 +59,11 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .nc{position:sticky;left:0;z-index:3;background:#fde8d8;min-width:110px;max-width:110px;text-align:left!important;padding:4px 6px!important;border-right:2px solid #d99672!important;font-size:11px;font-weight:700;color:#8b4513;}
 .nc-body{position:sticky;left:0;z-index:2;background:#fffdf5;min-width:110px;max-width:110px;text-align:left!important;padding:4px 6px!important;border-right:2px solid #d99672!important;}
 
-/* Header rows — uniform (no weekend special bg) */
+/* Header rows */
 .hdr1 th,.hdr2 th{background:#fde8d8;color:#8b4513;font-size:11px;font-weight:700;height:26px;font-family:'Sarabun',sans-serif;}
 .hdr2 th{font-size:10px;height:22px;font-weight:600;}
+/* Weekend highlight — applies to header AND day cells */
+.hdr1 th.wknd,.hdr2 th.wknd{background:#fce4ec;color:#c2185b;}
 .sub-hd{background:#fde8d8;color:#8b4513;font-size:11px;font-weight:700;padding:2px 4px!important;line-height:1.15;}
 .sub-hd-sm{font-size:10px;font-weight:600;}
 
@@ -71,6 +73,10 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .dc.W{background:#d5edd8;}
 .dc.OFF{background:#e74c3c;color:#fff;font-weight:800;}
 .dc.HALF{background:#fef3c0;color:#d97706;font-weight:700;}
+.dc.REQ_OFF{background:#fcd34d;color:#7c2d12;font-weight:800;}
+/* Weekend variants — tinted slightly */
+.dc.wknd.W{background:#bfe0c4;}
+.dc.wknd{background:#fff0f5;}
 .dc.pub-h{position:relative;}
 .dc.pub-h::after{content:'★';position:absolute;top:0;right:1px;font-size:7px;color:#ff6f00;line-height:1.2;}
 
@@ -221,9 +227,11 @@ body.exporting #sched-tbl{width:auto!important;}
     <div id="month-tabs"></div>
     <div class="legend">
       <div class="leg-item"><span class="leg-dot" style="background:#d5edd8;"></span>ทำงาน</div>
-      <div class="leg-item"><span class="leg-dot" style="background:#e74c3c;border-color:#c0392b;"></span><span style="color:#fff;background:#e74c3c;padding:1px 5px;border-radius:2px;font-weight:700;font-size:9px;">OFF</span></div>
-      <div class="leg-item"><span class="leg-dot" style="background:#fef3c0;"></span>ครึ่งวัน</div>
+      <div class="leg-item"><span style="color:#fff;background:#e74c3c;padding:1px 5px;border-radius:2px;font-weight:700;font-size:9px;">OFF</span>หยุดประจำ</div>
+      <div class="leg-item"><span class="leg-dot" style="background:#fef3c0;"></span>ครึ่งวัน (½)</div>
+      <div class="leg-item"><span style="color:#7c2d12;background:#fcd34d;padding:1px 5px;border-radius:2px;font-weight:700;font-size:9px;">OFF</span>หยุด (รีเควส)</div>
       <div class="leg-item"><span style="color:#ff6f00;font-size:10px;">★</span>วันหยุดนักขัตฤกษ์</div>
+      <div class="leg-item"><span class="leg-dot" style="background:#fff0f5;border-color:#fce4ec;"></span>เสาร์-อาทิตย์</div>
     </div>
     <div id="note-bar"></div>
   </div>
@@ -257,7 +265,27 @@ const MONTH_EN = ['','January','February','March','April','May','June','July','A
 const DAY_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
 const TYPE_LBL = {regular:'ประจำ',parttime:'พาสไทม์',intern:'ฝึกงาน'};
 const BADGE_CLS = {regular:'b-reg',parttime:'b-pt',intern:'b-int'};
-const CYCLE = {W:'OFF',OFF:'HALF',HALF:'W'};
+// 4-state cycle: W → OFF (red) → HALF (½) → REQ_OFF (yellow) → W
+const CYCLE = {W:'OFF',OFF:'HALF',HALF:'REQ_OFF',REQ_OFF:'W'};
+const STATE_LBL = {W:'',OFF:'OFF',HALF:'½',REQ_OFF:'OFF'};
+// 4 pastel colors for group cells
+const GRP_COLORS = [
+  {key:'',     bg:'',         label:'ค่าเริ่มต้น', dot:'#fff3e0'},
+  {key:'pink', bg:'#ffd6e0',  label:'ชมพู',       dot:'#ffd6e0'},
+  {key:'blue', bg:'#c8e6f4',  label:'ฟ้า',        dot:'#c8e6f4'},
+  {key:'mint', bg:'#c8e6c9',  label:'มิ้นต์',      dot:'#c8e6c9'},
+  {key:'yellow',bg:'#fff4c4', label:'เหลือง',     dot:'#fff4c4'},
+];
+function grpColorBg(key){
+  const c = GRP_COLORS.find(x=>x.key===key);
+  return c ? c.bg : '';
+}
+// Normalize group entry — may be string (legacy) or {name,color} (new)
+function normGroup(v){
+  if(!v) return {name:'', color:''};
+  if(typeof v === 'string') return {name:v, color:''};
+  return {name:v.name||'', color:v.color||''};
+}
 
 // Thai public holidays (วันหยุดนักขัตฤกษ์) by "YYYY-MM" → [day numbers]
 // Source: Thai Cabinet announcements / Bank of Thailand calendars
@@ -478,14 +506,15 @@ function countWeekdayInMonth(year, month, weekday){
 
 // Derive employee stats. Regulars: auto-calc. Others: use stored values.
 function deriveEmpStats(emp, m){
-  let off=0, half=0, wk=0;
+  let off=0, half=0, reqOff=0, wk=0;
   for(let d=1; d<=m.days; d++){
     const s = (emp.schedule&&emp.schedule[d])||'W';
     if(s==='W') wk++;
     else if(s==='OFF') off++;
+    else if(s==='REQ_OFF') reqOff++;
     else if(s==='HALF'){ half++; wk+=0.5; }
   }
-  const actualOff = off + half*0.5;
+  const actualOff = off + reqOff + half*0.5;
   const tueCount = countWeekdayInMonth(m.year, m.month, 2);
 
   if(emp.type==='regular'){
@@ -494,11 +523,11 @@ function deriveEmpStats(emp, m){
     const phTotal = phCarry + holidaysAdded;
     const vacUsed = Math.max(0, actualOff - tueCount);
     const phRemain = phTotal - vacUsed;
-    return {wk, off, half, actualOff, tueCount, holidaysAdded, phCarry,
+    return {wk, off, half, reqOff, actualOff, tueCount, holidaysAdded, phCarry,
             phTotal, phRemain, vacUsed, auto:true};
   }
   // Non-regular: keep stored values
-  return {wk, off, half, actualOff, tueCount,
+  return {wk, off, half, reqOff, actualOff, tueCount,
           phTotal: emp.phTotal||'', phRemain: emp.phRemain||'',
           vacUsed: emp.vacUsed||'', auto:false};
 }
@@ -605,7 +634,8 @@ function renderSchedule(){
     <th class="nc" style="min-width:30px;max-width:30px;text-align:center!important;">No.</th>
     <th class="nc" style="min-width:108px;max-width:108px;">Name</th>`;
   for(let d=1;d<=m.days;d++){
-    h1+=`<th style="min-width:26px;width:26px;">${d}</th>`;
+    const w=dow(m.year,m.month,d), wk=w===0||w===6;
+    h1+=`<th class="${wk?'wknd':''}" style="min-width:26px;width:26px;">${d}</th>`;
   }
   h1+=`<th class="sub-hd" colspan="2">Day type</th>
        <th class="sub-hd">ใช้วันหยุด</th>
@@ -616,8 +646,8 @@ function renderSchedule(){
     <th class="nc" style="min-width:30px;max-width:30px;"></th>
     <th class="nc" style="min-width:108px;max-width:108px;font-size:10px;">Day type</th>`;
   for(let d=1;d<=m.days;d++){
-    const w=dow(m.year,m.month,d);
-    h2+=`<th>${DAY_TH[w]}</th>`;
+    const w=dow(m.year,m.month,d), wk=w===0||w===6;
+    h2+=`<th class="${wk?'wknd':''}">${DAY_TH[w]}</th>`;
   }
   h2+=`<th class="sub-hd sub-hd-sm">work</th>
        <th class="sub-hd sub-hd-sm">Day off</th>
@@ -639,9 +669,9 @@ function renderSchedule(){
     let cells='';
     for(let d=1;d<=m.days;d++){
       const s=(emp.schedule&&emp.schedule[d])||'W';
-      const isPH=ph.has(d);
-      const lbl = s==='OFF'?'OFF': s==='HALF'?'½':'';
-      cells+=`<td class="dc ${s}${isPH?' pub-h':''}" onclick="tap(${ei},${d})">${lbl}</td>`;
+      const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
+      const lbl = STATE_LBL[s]||'';
+      cells+=`<td class="dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}" onclick="tap(${ei},${d})">${lbl}</td>`;
     }
     const pos = emp.position||'';
     const st = deriveEmpStats(emp, m);
@@ -671,13 +701,14 @@ function renderSchedule(){
   const grps = m.groups||{};
   let grpCells='';
   for(let d=1;d<=m.days;d++){
-    const g=grps[d]||'';
-    grpCells+=`<td class="grp-cell${g?' has-grp':''}" onclick="editGroup(${d})"><span class="grp-txt">${esc(g)}</span></td>`;
+    const g = normGroup(grps[d]);
+    const bg = grpColorBg(g.color);
+    const styleAttr = bg ? `style="background:${bg};"` : '';
+    grpCells+=`<td class="grp-cell${g.name?' has-grp':''}" ${styleAttr} onclick="editGroup(${d})"><span class="grp-txt">${esc(g.name)}</span></td>`;
   }
 
-  // Dynamic group row height — fit longest group name (rotated text reads bottom-to-top)
-  // visual height of rotated text ≈ chars * ~9px (Thai @ 10px font)
-  const grpNames = Object.values(grps).filter(v=>v);
+  // Dynamic group row height — fit longest group name
+  const grpNames = Object.values(grps).map(g=>normGroup(g).name).filter(v=>v);
   const maxChars = grpNames.length ? Math.max(...grpNames.map(n=>String(n).length)) : 0;
   const grpRowH = Math.max(60, Math.min(180, maxChars * 9 + 18));
 
@@ -710,11 +741,11 @@ function tap(ei,d){
   saveLocal(); markDirty();
   const ph=new Set(m.publicHolidays||[]);
   const s=emp.schedule[d];
-  const isPH=ph.has(d);
+  const w=dow(m.year,m.month,d), wknd=w===0||w===6, isPH=ph.has(d);
   const cell=document.querySelector(`tr[data-ei="${ei}"] td.dc[onclick="tap(${ei},${d})"]`);
   if(cell){
-    cell.className=`dc ${s}${isPH?' pub-h':''}`;
-    cell.textContent=s==='OFF'?'OFF':s==='HALF'?'½':'';
+    cell.className=`dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}`;
+    cell.textContent=STATE_LBL[s]||'';
   }
   updateRowTotals(ei);
 }
@@ -764,22 +795,44 @@ function saveEmpName(ei){
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
+let _grpEditState = {color:''};
 function editGroup(d){
   if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
   const m=data[curKey]; if(!m) return;
   if(!m.groups) m.groups={};
-  const cur=m.groups[d]||'';
+  const cur = normGroup(m.groups[d]);
+  _grpEditState.color = cur.color || '';
+  const colorBtns = GRP_COLORS.map(c=>`
+    <button type="button" class="grp-color-btn ${c.key===_grpEditState.color?'active':''}" data-color="${c.key}"
+      onclick="pickGrpColor('${c.key}')"
+      style="background:${c.bg||'#fff3e0'};border:2px solid ${c.key===_grpEditState.color?'#e07b54':'#ccc'};
+             border-radius:8px;padding:8px 6px;cursor:pointer;font-size:11px;color:#5d4037;font-family:inherit;
+             flex:1;min-width:60px;font-weight:600;">
+      ${c.label}
+    </button>`).join('');
   openModal('ชื่อ กรุ๊ป — วันที่ '+d,
     `<div class="fg"><label>ชื่อกรุ๊ป/ทัวร์ วันที่ ${d}</label>
-     <input type="text" id="grp-inp" value="${esc(cur)}" placeholder="เช่น กรุ๊ป พี่แคท" maxlength="30"></div>`,
+       <input type="text" id="grp-inp" value="${esc(cur.name)}" placeholder="เช่น กรุ๊ป พี่แคท" maxlength="30"></div>
+     <div class="fg"><label>สีพื้นหลังช่อง</label>
+       <div id="grp-color-row" style="display:flex;gap:6px;flex-wrap:wrap;">${colorBtns}</div></div>`,
     `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
      <button class="btn-pri" onclick="saveGroup(${d})">บันทึก</button>`);
   setTimeout(()=>document.getElementById('grp-inp').focus(),100);
 }
+function pickGrpColor(key){
+  _grpEditState.color = key;
+  document.querySelectorAll('.grp-color-btn').forEach(btn=>{
+    const active = btn.dataset.color===key;
+    btn.classList.toggle('active', active);
+    btn.style.borderColor = active ? '#e07b54' : '#ccc';
+  });
+}
 function saveGroup(d){
   const v=document.getElementById('grp-inp').value.trim();
+  const c=_grpEditState.color||'';
   if(!data[curKey].groups) data[curKey].groups={};
-  if(v) data[curKey].groups[d]=v; else delete data[curKey].groups[d];
+  if(v) data[curKey].groups[d] = {name:v, color:c};
+  else delete data[curKey].groups[d];
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
