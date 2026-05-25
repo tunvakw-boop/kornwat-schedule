@@ -91,9 +91,10 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 /* Group row */
 .grp-row td{background:#fef3e2;height:64px;}
 .grp-row .nc-body{background:#fde8d8;color:#8b4513;font-weight:700;font-size:11px;}
-.grp-cell{cursor:pointer;font-size:10px;color:#5d4037;writing-mode:vertical-rl;transform:rotate(180deg);padding:2px!important;font-weight:600;font-family:'Sarabun',sans-serif;}
+.grp-cell{cursor:pointer;padding:0!important;vertical-align:middle;text-align:center!important;overflow:hidden;}
 .grp-cell:active{background:#fce4ec!important;}
 .grp-cell.has-grp{background:#fff3e0;}
+.grp-cell .grp-txt{display:inline-block;transform:rotate(-90deg);transform-origin:center center;white-space:nowrap;font-size:10px;color:#5d4037;font-weight:600;font-family:'Sarabun',sans-serif;line-height:1;letter-spacing:.2px;}
 
 /* Excel-style month tabs */
 #month-tabs{display:flex;background:#f0e0d0;border-top:2px solid #d99672;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;height:36px;align-items:flex-end;padding:0 2px;}
@@ -611,7 +612,7 @@ function renderSchedule(){
   let grpCells='';
   for(let d=1;d<=m.days;d++){
     const g=grps[d]||'';
-    grpCells+=`<td class="grp-cell${g?' has-grp':''}" onclick="editGroup(${d})">${esc(g)}</td>`;
+    grpCells+=`<td class="grp-cell${g?' has-grp':''}" onclick="editGroup(${d})"><span class="grp-txt">${esc(g)}</span></td>`;
   }
   const regs=m.employees.filter(e=>e.name&&e.type==='regular');
   let avgWk='',avgOf='';
