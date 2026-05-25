@@ -74,9 +74,9 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .dc.OFF{background:#e74c3c;color:#fff;font-weight:800;}
 .dc.HALF{background:#fef3c0;color:#d97706;font-weight:700;}
 .dc.REQ_OFF{background:#fcd34d;color:#7c2d12;font-weight:800;}
-/* Weekend variants — tinted slightly */
-.dc.wknd.W{background:#bfe0c4;}
-.dc.wknd{background:#fff0f5;}
+/* Weekend: only the W (background) cells get pink tint matching header.
+   OFF / HALF / REQ_OFF keep their normal colors regardless of weekday. */
+.dc.wknd.W{background:#fce4ec;}
 .dc.pub-h{position:relative;}
 .dc.pub-h::after{content:'★';position:absolute;top:0;right:1px;font-size:7px;color:#ff6f00;line-height:1.2;}
 
@@ -231,7 +231,7 @@ body.exporting #sched-tbl{width:auto!important;}
       <div class="leg-item"><span class="leg-dot" style="background:#fef3c0;"></span>ครึ่งวัน (½)</div>
       <div class="leg-item"><span style="color:#7c2d12;background:#fcd34d;padding:1px 5px;border-radius:2px;font-weight:700;font-size:9px;">OFF</span>หยุด (รีเควส)</div>
       <div class="leg-item"><span style="color:#ff6f00;font-size:10px;">★</span>วันหยุดนักขัตฤกษ์</div>
-      <div class="leg-item"><span class="leg-dot" style="background:#fff0f5;border-color:#fce4ec;"></span>เสาร์-อาทิตย์</div>
+      <div class="leg-item"><span class="leg-dot" style="background:#fce4ec;border-color:#fce4ec;"></span>เสาร์-อาทิตย์</div>
     </div>
     <div id="note-bar"></div>
   </div>
