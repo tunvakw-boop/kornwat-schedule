@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ตารางพนักงาน - Kornwat Garden Resort</title>
 <meta name="theme-color" content="#e07b54">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -169,6 +171,23 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .locked-cell:active{opacity:1!important;}
 #lock-banner{background:#fff3c4;color:#7a5d20;font-size:11px;padding:4px 10px;text-align:center;border-bottom:1px solid #e9d090;flex-shrink:0;font-weight:600;}
 #lock-banner.hidden{display:none;}
+
+/* ── EXPORTING state (strip sticky/overflow so html2canvas can capture full table) ── */
+body.exporting{overflow:visible!important;height:auto!important;}
+body.exporting #bottom-nav,
+body.exporting #fab,
+body.exporting #lock-banner,
+body.exporting #note-bar,
+body.exporting .legend,
+body.exporting #month-tabs,
+body.exporting #app-header{display:none!important;}
+body.exporting #main{overflow:visible!important;height:auto!important;}
+body.exporting .view{overflow:visible!important;height:auto!important;}
+body.exporting .sched-wrap{overflow:visible!important;padding:8px!important;}
+body.exporting .tbl-frame{overflow:visible!important;display:inline-block!important;}
+body.exporting .nc,
+body.exporting .nc-body{position:static!important;}
+body.exporting #sched-tbl{width:auto!important;}
 </style>
 </head>
 <body>
@@ -546,11 +565,13 @@ function renderSchedule(){
   document.getElementById('tbl-head').innerHTML = titleHTML + h1 + h2;
 
   let body = '';
+  let autoNo = 0;
   m.employees.forEach((emp, ei) => {
     if(!emp.name){
       body+=`<tr style="height:28px;"><td class="nc-body" style="min-width:30px;max-width:30px;"></td><td class="nc-body" style="min-width:108px;max-width:108px;"></td>${'<td style="background:#fffdf5;"></td>'.repeat(m.days+5+1)}</tr>`;
       return;
     }
+    autoNo++;
     let wk=0,of=0;
     let cells='';
     for(let d=1;d<=m.days;d++){
@@ -561,8 +582,15 @@ function renderSchedule(){
       cells+=`<td class="dc ${s}${wknd?' wknd':''}${isPH?' pub-h':''}" onclick="tap(${ei},${d})">${lbl}</td>`;
     }
     const pos = emp.position||'';
+    // Auto-compute phRemain from phTotal - vacUsed if both numeric
+    const phT = emp.phTotal||'';
+    const vU = emp.vacUsed||'';
+    let phR = emp.phRemain||'';
+    const phTn = parseFloat(phT), vUn = parseFloat(vU);
+    if(!isNaN(phTn) && !isNaN(vUn)) phR = String(+(phTn - vUn).toFixed(2));
+    else if(!isNaN(phTn) && !vU) phR = String(phTn);
     body+=`<tr class="emp-row" data-ei="${ei}">
-      <td class="nc-body emp-no-cell" style="min-width:30px;max-width:30px;">${esc(emp.no||'')}</td>
+      <td class="nc-body emp-no-cell" style="min-width:30px;max-width:30px;">${autoNo}</td>
       <td class="nc-body" style="min-width:108px;max-width:108px;" onclick="editEmpName(${ei})">
         <span class="emp-name">${esc(emp.name)}</span>
         ${pos?`<span class="emp-pos">${esc(pos)}</span>`:''}
@@ -570,9 +598,9 @@ function renderSchedule(){
       ${cells}
       <td class="sc wk" id="wk-${ei}">${wk}</td>
       <td class="sc of" id="of-${ei}">${of}</td>
-      <td class="sc vc">${esc(emp.vacUsed||'')}</td>
-      <td class="sc ph">${esc(emp.phTotal||'')}</td>
-      <td class="sc ph">${esc(emp.phRemain||'')}</td>
+      <td class="sc vc" id="vc-${ei}" onclick="editVacUsed(${ei})" title="แตะเพื่อแก้ไข">${esc(vU)||'<span style="color:#ccc;">—</span>'}</td>
+      <td class="sc ph" id="pht-${ei}" onclick="editPhTotal(${ei})" title="แตะเพื่อแก้ไข">${esc(phT)||'<span style="color:#ccc;">—</span>'}</td>
+      <td class="sc ph" id="phr-${ei}">${esc(phR)}</td>
       <td class="rc" onclick="editRemark(${ei})" title="แตะเพื่อแก้ไข">${esc(emp.remark||'')||'<span style="color:#ccc;">—</span>'}</td>
     </tr>`;
   });
@@ -598,9 +626,12 @@ function renderSchedule(){
     ${grpCells}
     <td class="sc wk" style="background:#fef3e2;writing-mode:initial;">${avgWk}</td>
     <td class="sc of" style="background:#fef3e2;writing-mode:initial;">${avgOf}</td>
-    <td colspan="3" style="background:#fef3e2;font-size:10px;color:#8b4513;text-align:left;padding:3px 5px;">${esc(m.note||'')}</td>
-    <td class="rc" style="background:#fef3e2;font-size:10px;color:#d97706;font-weight:700;">วันหยุดเพิ่ม</td>
+    <td colspan="3" style="background:#fef3e2;font-size:10px;color:#8b4513;text-align:left;padding:3px 5px;cursor:pointer;" onclick="showEditHolidayModal()" title="แตะเพื่อแก้ไขวันหยุด/หมายเหตุ">${esc(m.note||'<span style="color:#aaa;">— แตะเพื่อใส่วันหยุด/หมายเหตุ —</span>')}</td>
+    <td class="rc" style="background:#fef3e2;font-size:10px;color:#d97706;font-weight:700;cursor:pointer;" onclick="showEditHolidayModal()">วันหยุดเพิ่ม ⚙</td>
   </tr>`;
+  // Also make the top note-bar clickable
+  const nb = document.getElementById('note-bar');
+  if(nb){ nb.style.cursor='pointer'; nb.onclick = ()=>showEditHolidayModal(); }
 }
 
 // ═══════════════════ INTERACTIONS ═══════════════════
@@ -635,6 +666,7 @@ function updateRowTotals(ei){
 }
 
 function editEmpName(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
   const e=data[curKey].employees[ei]; if(!e||!e.name) return;
   openModal('แก้ไข ชื่อ / ตำแหน่ง',
     `<div class="fg"><label>ชื่อพนักงาน *</label><input type="text" id="en-name" value="${esc(e.name)}" maxlength="50"></div>
@@ -662,6 +694,7 @@ function saveEmpName(ei){
 }
 
 function editGroup(d){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
   const m=data[curKey]; if(!m) return;
   if(!m.groups) m.groups={};
   const cur=m.groups[d]||'';
@@ -680,6 +713,7 @@ function saveGroup(d){
 }
 
 function editRemark(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
   const emp=data[curKey].employees[ei]; if(!emp) return;
   openModal('หมายเหตุ — '+emp.name,
     `<div class="fg"><label>หมายเหตุ</label>
@@ -689,6 +723,52 @@ function editRemark(ei){
 }
 function saveRemark(ei){
   data[curKey].employees[ei].remark=document.getElementById('rem-inp').value.trim();
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── Vacation used (ใช้วันหยุด) editor — auto-recalcs phRemain ──
+function editVacUsed(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  openModal('ใช้วันหยุด — '+emp.name,
+    `<div class="fg"><label>ใช้วันหยุด (วัน) — รองรับครึ่งวัน (0.5)</label>
+       <input type="number" id="vu-inp" value="${esc(emp.vacUsed||'')}" min="0" max="31" step="0.5" placeholder="0"></div>
+     <div class="fg"><label>วันหยุดที่มี (รวม)</label>
+       <input type="number" id="vu-pht" value="${esc(emp.phTotal||'')}" min="0" max="31" step="0.5" placeholder="0"></div>
+     <p style="font-size:11px;color:#666;margin-top:-4px;">คงเหลือคำนวณอัตโนมัติ = ที่มี − ใช้</p>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveVacUsed(${ei})">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('vu-inp').focus(),100);
+}
+function saveVacUsed(ei){
+  const e = data[curKey].employees[ei];
+  const v = document.getElementById('vu-inp').value;
+  const t = document.getElementById('vu-pht').value;
+  e.vacUsed = v===''?'':String(parseFloat(v));
+  e.phTotal = t===''?'':String(parseFloat(t));
+  const vn = parseFloat(v), tn = parseFloat(t);
+  e.phRemain = (!isNaN(vn) && !isNaN(tn)) ? String(+(tn - vn).toFixed(2)) : (t===''?'':String(parseFloat(t)));
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── Public-holiday total editor (วันหยุดที่มี) ──
+function editPhTotal(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  openModal('วันหยุดที่มี — '+emp.name,
+    `<div class="fg"><label>วันหยุดที่มี (รวม)</label>
+       <input type="number" id="pt-inp" value="${esc(emp.phTotal||'')}" min="0" max="60" step="0.5" placeholder="0"></div>
+     <p style="font-size:11px;color:#666;">คงเหลือ = ที่มี − ใช้วันหยุด (คำนวณอัตโนมัติ)</p>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="savePhTotal(${ei})">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('pt-inp').focus(),100);
+}
+function savePhTotal(ei){
+  const e = data[curKey].employees[ei];
+  const t = document.getElementById('pt-inp').value;
+  e.phTotal = t===''?'':String(parseFloat(t));
+  const tn = parseFloat(t), vn = parseFloat(e.vacUsed);
+  e.phRemain = (!isNaN(tn) && !isNaN(vn)) ? String(+(tn - vn).toFixed(2)) : (t===''?'':String(parseFloat(t)));
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
@@ -909,12 +989,21 @@ function addEmp(){
 }
 
 function showEditHolidayModal(){
-  const m=data[curKey];
-  openModal('วันหยุดนักขัตฤกษ์',
-    `<div class="fg"><label>วันที่หยุด (คั่นจุลภาค)</label>
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const m=data[curKey]; if(!m) return;
+  const phInfo = lookupThaiHolidays(m.year, m.month);
+  const suggestedDays = phInfo.days.filter(d=>d>=1 && d<=m.days);
+  const hasSuggestion = suggestedDays.length>0;
+  openModal(`วันหยุด — ${m.label}`,
+    `<div class="fg"><label>วันที่หยุด (คั่นด้วยจุลภาค)</label>
        <input type="text" id="eh-ph" value="${(m.publicHolidays||[]).join(', ')}" placeholder="เช่น 1,5,12"></div>
-     <div class="fg"><label>หมายเหตุ</label>
-       <input type="text" id="eh-note" value="${esc(m.note||'')}"></div>`,
+     ${hasSuggestion?`<div style="background:#fef3e2;padding:8px 10px;border-radius:6px;margin-bottom:11px;font-size:11px;color:#8b4513;">
+       💡 ปฏิทินไทย: <strong>${suggestedDays.join(', ')}</strong> · ${esc(phInfo.note)}
+       <br><button type="button" onclick="document.getElementById('eh-ph').value='${suggestedDays.join(', ')}';document.getElementById('eh-note').value='${esc(phInfo.note)}';" style="margin-top:5px;background:#e07b54;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit;">↻ ใช้ค่านี้</button>
+     </div>`:''}
+     <div class="fg"><label>หมายเหตุ (โน้ตเดือนนี้)</label>
+       <textarea id="eh-note" placeholder="เช่น เดือน X หยุด N วัน...">${esc(m.note||'')}</textarea></div>
+     <p style="font-size:10px;color:#888;margin-top:-4px;">★ จะปรากฏที่ช่องวันเหล่านี้ทุกพนักงาน</p>`,
     `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
      <button class="btn-pri" onclick="saveHoliday()">บันทึก</button>`);
 }
@@ -928,57 +1017,40 @@ function saveHoliday(){
 // ═══════════════════ EXPORT ═══════════════════
 function isMobile(){ return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
 
-// Capture the schedule table at full natural width — clone offscreen,
-// strip sticky positioning so left column doesn't overlap day cells.
+// Modify-restore pattern: temporarily strip sticky/overflow from real DOM,
+// capture, then restore. Much more reliable than offscreen clone.
 async function captureTable(){
   if(typeof html2canvas==='undefined'){
     showToast('⚠ html2canvas ไม่พร้อม — เช็คเน็ตและรีโหลด'); return null;
   }
-  const original = document.getElementById('tbl-frame');
-  if(!original){ showToast('⚠ ไม่พบตาราง'); return null; }
-
   showToast('⏳ กำลังสร้างรูป...');
 
-  // Switch to schedule view so the table is in the DOM tree fully rendered
+  // Switch to schedule view so table is rendered
   const wasView = curView;
   if(wasView!=='schedule'){ switchView('schedule'); await new Promise(r=>setTimeout(r,80)); }
 
-  // Build a fully-rendered standalone container (no scroll wrappers, no sticky)
-  const host = document.createElement('div');
-  host.style.cssText='position:fixed;left:-200000px;top:0;background:#fffdf5;padding:18px;display:inline-block;';
-  const clone = original.cloneNode(true);
-  clone.style.cssText='display:inline-block;border:2px solid #d99672;border-radius:8px;overflow:visible;background:#fffdf5;max-width:none;';
+  // Apply exporting class — strips sticky, overflow, hides chrome
+  document.body.classList.add('exporting');
+  // Force reflow
+  await new Promise(r=>setTimeout(r,80));
 
-  // Strip sticky from header/body name cells inside the clone
-  clone.querySelectorAll('.nc, .nc-body').forEach(el=>{
-    el.style.position='static';
-    el.style.zIndex='auto';
-  });
-  // Make sure the table renders at natural width
-  const tbl = clone.querySelector('#sched-tbl');
-  if(tbl){ tbl.style.width='auto'; }
-
-  host.appendChild(clone);
-  document.body.appendChild(host);
-
-  // Allow layout
-  await new Promise(r=>setTimeout(r,60));
-
-  const w = host.scrollWidth;
-  const h = host.scrollHeight;
+  const frame = document.getElementById('tbl-frame');
+  const w = frame.scrollWidth;
+  const h = frame.scrollHeight;
 
   try{
-    const canvas = await html2canvas(host, {
+    const canvas = await html2canvas(frame, {
       backgroundColor:'#fffdf5',
-      scale: 2,
+      scale: 1.5,
       width: w, height: h,
-      windowWidth: w, windowHeight: h,
+      windowWidth: Math.max(w + 60, 800),
+      windowHeight: Math.max(h + 60, 600),
       useCORS:true, allowTaint:true, logging:false,
-      scrollX:0, scrollY:0,
+      scrollX:0, scrollY:0, x:0, y:0,
     });
     return canvas;
   }finally{
-    document.body.removeChild(host);
+    document.body.classList.remove('exporting');
     if(wasView!=='schedule') switchView(wasView);
   }
 }
