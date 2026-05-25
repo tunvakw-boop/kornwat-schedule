@@ -89,12 +89,14 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .rc{min-width:90px;font-size:10px;color:#555;text-align:left!important;padding:3px 5px!important;background:#fffdf5;cursor:pointer;}
 
 /* Group row */
-.grp-row td{background:#fef3e2;height:64px;}
+.grp-row td{background:#fef3e2;height:72px;}
 .grp-row .nc-body{background:#fde8d8;color:#8b4513;font-weight:700;font-size:11px;}
-.grp-cell{cursor:pointer;padding:0!important;vertical-align:middle;text-align:center!important;overflow:hidden;}
+.grp-cell{cursor:pointer;padding:0!important;vertical-align:middle;text-align:center!important;position:relative;overflow:visible;width:26px;min-width:26px;max-width:26px;}
 .grp-cell:active{background:#fce4ec!important;}
 .grp-cell.has-grp{background:#fff3e0;}
-.grp-cell .grp-txt{display:inline-block;transform:rotate(-90deg);transform-origin:center center;white-space:nowrap;font-size:10px;color:#5d4037;font-weight:600;font-family:'Sarabun',sans-serif;line-height:1;letter-spacing:.2px;}
+/* Use absolute positioning + transform so text always centers in cell,
+   regardless of natural text width. Reads bottom-to-top (tilt head left). */
+.grp-cell .grp-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);transform-origin:center center;white-space:nowrap;font-size:10px;color:#5d4037;font-weight:600;font-family:'Sarabun',sans-serif;line-height:1;letter-spacing:.2px;pointer-events:none;}
 
 /* Excel-style month tabs */
 #month-tabs{display:flex;background:#f0e0d0;border-top:2px solid #d99672;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;height:36px;align-items:flex-end;padding:0 2px;}
