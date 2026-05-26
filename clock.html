@@ -451,22 +451,32 @@ function renderEmpList(){
 }
 
 // ═══════════════ TIME PICKER HELPER ═══════════════
-function timePicker(idPrefix, value){
+// Minute step depends on context:
+//   'assign' mode (กำหนดเวลาเข้างาน) → 00, 30 only
+//   'record' mode (ลงเวลาทำงานจริง) → 00, 15, 30, 45
+function timePicker(idPrefix, value, granularity){
+  const gran = granularity || mode;  // 'assign' or 'record'
   const hh = (value||'').split(':')[0] || '08';
   const mm = (value||'').split(':')[1] || '00';
-  const mmRound = mm==='30' ? '30' : '00';
   let hOpts = '';
   for(let h=0; h<24; h++){
     const v = String(h).padStart(2,'0');
     hOpts += `<option value="${v}" ${v===hh?'selected':''}>${v}</option>`;
   }
+  const minutes = (gran==='record') ? ['00','15','30','45'] : ['00','30'];
+  // Round mm to nearest option
+  const mmNum = parseInt(mm)||0;
+  let mmRound = minutes[0];
+  let minDiff = Infinity;
+  minutes.forEach(opt=>{
+    const diff = Math.abs(parseInt(opt) - mmNum);
+    if(diff < minDiff){ minDiff = diff; mmRound = opt; }
+  });
+  const mOpts = minutes.map(opt=>`<option value="${opt}" ${opt===mmRound?'selected':''}>${opt}</option>`).join('');
   return `<div class="time-picker">
     <select id="${idPrefix}-h">${hOpts}</select>
     <span class="colon">:</span>
-    <select id="${idPrefix}-m">
-      <option value="00" ${mmRound==='00'?'selected':''}>00</option>
-      <option value="30" ${mmRound==='30'?'selected':''}>30</option>
-    </select>
+    <select id="${idPrefix}-m">${mOpts}</select>
   </div>`;
 }
 function readTimePicker(idPrefix){
@@ -512,10 +522,10 @@ async function saveAssign(empName, day){
       periods: cur.periods||[],
       note, recorder_name: recorderName
     };
-    await sbFetch('POST','time_entries',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+    await sbFetch('POST','time_entries?on_conflict=month_key,emp_name,day',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
     timeEntriesForMonth[`${empName}|${day}`] = body;
     closeModal(); renderEmpList(); showToast('บันทึกแล้ว ✓');
-  }catch(e){ console.error(e); showToast('⚠ บันทึกไม่สำเร็จ'); }
+  }catch(e){ console.error('saveAssign error:',e); showToast('⚠ '+(e.message||'บันทึกไม่สำเร็จ').slice(0,80)); }
 }
 
 // ═══════════════ RECORD MODAL (ลงเวลาทำงานจริง — for OT) ═══════════════
@@ -602,7 +612,6 @@ function removePeriod(idx){
 }
 async function saveRecord(empName, day){
   readPeriodsDraft();
-  // Validate
   const valid = _periodsDraft.filter(p=>p.in && p.out);
   if(!valid.length){ alert('กรอกอย่างน้อย 1 ช่วงเวลา'); return; }
   const note = document.getElementById('te-note').value.trim();
@@ -618,10 +627,10 @@ async function saveRecord(empName, day){
       periods: valid,
       note, recorder_name: recorderName
     };
-    await sbFetch('POST','time_entries',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+    await sbFetch('POST','time_entries?on_conflict=month_key,emp_name,day',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
     timeEntriesForMonth[`${empName}|${day}`] = body;
     closeModal(); renderEmpList(); showToast(`บันทึกแล้ว ✓ (OT ${fmtHours(stats.otMin)} ชม.)`);
-  }catch(e){ console.error(e); showToast('⚠ บันทึกไม่สำเร็จ'); }
+  }catch(e){ console.error('saveRecord error:',e); showToast('⚠ '+(e.message||'บันทึกไม่สำเร็จ').slice(0,80)); }
 }
 async function deleteRecord(empName, day){
   if(!confirm(`ลบเวลาทำงานจริงของ ${empName} วันนี้?`)) return;
@@ -636,15 +645,14 @@ async function deleteRecord(empName, day){
       note: cur.note||'', recorder_name: recorderName
     };
     if(!cur.work_start){
-      // No work_start either → delete whole row
       await sbFetch('DELETE',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&emp_name=eq.${encodeURIComponent(empName)}&day=eq.${day}`);
       delete timeEntriesForMonth[`${empName}|${day}`];
     } else {
-      await sbFetch('POST','time_entries',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+      await sbFetch('POST','time_entries?on_conflict=month_key,emp_name,day',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
       timeEntriesForMonth[`${empName}|${day}`] = body;
     }
     closeModal(); renderEmpList(); showToast('ลบแล้ว');
-  }catch(e){ console.error(e); showToast('⚠ ลบไม่สำเร็จ'); }
+  }catch(e){ console.error('deleteRecord error:',e); showToast('⚠ '+(e.message||'ลบไม่สำเร็จ').slice(0,80)); }
 }
 
 async function deleteEntry(empName, day){

@@ -361,7 +361,7 @@ async function cloudGetTimeEntriesForMonth(monthKey){
   return await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&select=*`);
 }
 async function cloudUpsertTimeEntry(entry){
-  return await sbFetch('POST','time_entries',[entry],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+  return await sbFetch('POST','time_entries?on_conflict=month_key,emp_name,day',[entry],{'Prefer':'resolution=merge-duplicates,return=minimal'});
 }
 async function cloudDeleteTimeEntry(monthKey, empName, day){
   return await sbFetch('DELETE',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&emp_name=eq.${encodeURIComponent(empName)}&day=eq.${day}`);
