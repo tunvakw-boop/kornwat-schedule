@@ -656,7 +656,11 @@ function switchView(v){
   document.querySelectorAll('.nb').forEach(b => b.classList.toggle('active', b.dataset.v===v));
   document.getElementById('fab').classList.toggle('hidden', v!=='schedule');
   if(v==='summary') renderSummary();
-  if(v==='payroll') renderPayroll();
+  if(v==='payroll'){
+    // Always fetch fresh time entries so changes from clock.html show up
+    invalidateTimeEntriesCache(curKey);
+    renderPayroll();
+  }
   if(v==='manage') renderManage();
 }
 
@@ -1223,10 +1227,12 @@ async function renderPayroll(){
   html += `</tbody></table></div>`;
 
   // Action buttons
-  html += `<div style="display:flex;gap:8px;margin-bottom:10px;">
-    <button class="btn-pri" onclick="exportPayrollPNG()" style="flex:1;">📷 บันทึกรูป</button>
-    <button class="btn-pri" onclick="exportPayrollPDF()" style="flex:1;">📄 บันทึก PDF</button>
-  </div>`;
+  html += `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <button class="btn-sec" onclick="refreshPayroll()" style="flex:0 0 auto;padding:8px 14px;">🔄 โหลดล่าสุด</button>
+    <button class="btn-pri" onclick="exportPayrollPNG()" style="flex:1;min-width:120px;">📷 บันทึกรูป</button>
+    <button class="btn-pri" onclick="exportPayrollPDF()" style="flex:1;min-width:120px;">📄 บันทึก PDF</button>
+  </div>
+  <p style="text-align:center;font-size:10px;color:#aaa;margin-bottom:10px;">⏱ ข้อมูลล่าสุด: ${new Date().toLocaleTimeString('th-TH')} · ออโต้รีเฟรชเมื่อเข้าหน้าทุกครั้ง</p>`;
 
   // Notes
   html += `<div class="sum-card"><div class="sum-card-hd">ℹ️ กติกาคำนวณ</div>
@@ -1246,6 +1252,13 @@ async function renderPayroll(){
 
 function fmt$(n){
   return Number(n||0).toLocaleString('th-TH', {maximumFractionDigits:2});
+}
+
+async function refreshPayroll(){
+  invalidateTimeEntriesCache(curKey);
+  showToast('🔄 กำลังโหลดล่าสุด...');
+  await renderPayroll();
+  showToast('✓ อัพเดทแล้ว');
 }
 
 // Export full payroll table as PNG
