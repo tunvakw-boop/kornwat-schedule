@@ -27,26 +27,33 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 .login-box p{color:#8b4513;font-size:12px;text-align:center;margin-bottom:18px;}
 .fg{margin-bottom:14px;}
 .fg label{display:block;font-size:12px;color:#8b4513;margin-bottom:5px;font-weight:600;}
-.fg input,.fg select{width:100%;padding:10px 12px;border:1px solid #f4b8a0;border-radius:7px;font-size:14px;font-family:'Sarabun',sans-serif;background:#fef9e7;}
-.fg input:focus,.fg select:focus{outline:2px solid #e07b54;border-color:#e07b54;}
-.btn-pri{width:100%;background:#e07b54;color:#fff;padding:11px;border:none;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;}
+.fg input,.fg select,.fg textarea{width:100%;padding:10px 12px;border:1px solid #f4b8a0;border-radius:7px;font-size:14px;font-family:'Sarabun',sans-serif;background:#fef9e7;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:2px solid #e07b54;border-color:#e07b54;}
+.btn-pri{background:#e07b54;color:#fff;padding:11px;border:none;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;}
 .btn-pri:active{background:#c44a1f;}
-.btn-sec{width:100%;background:#e0e0e0;color:#333;padding:9px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;}
+.btn-sec{background:#e0e0e0;color:#333;padding:9px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;}
+.btn-pri.wide,.btn-sec.wide{width:100%;}
 
 /* MAIN */
 #main{flex:1;padding:12px;display:none;}
 #date-bar{background:#fff;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.1);}
 .nav-arr{background:#fef0e0;border:1px solid #e07b54;color:#e07b54;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;font-weight:700;}
-#date-label{flex:1;text-align:center;font-size:14px;font-weight:700;color:#c44a1f;}
+.nav-arr:active{background:#e07b54;color:#fff;}
+#date-mid{flex:1;text-align:center;font-size:14px;font-weight:700;color:#c44a1f;cursor:pointer;}
 #date-sub{font-size:11px;color:#888;display:block;font-weight:400;}
+#date-picker{position:absolute;opacity:0;pointer-events:none;width:0;height:0;}
 
-.action-row{display:flex;gap:6px;margin-bottom:10px;}
-.action-row button{flex:1;background:#e07b54;color:#fff;border:none;padding:10px 8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.3;}
-.action-row button:active{background:#c44a1f;}
-.action-row button.secondary{background:#fef0e0;color:#c44a1f;border:1px solid #e07b54;}
+.action-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:10px;}
+.action-row button{background:#fef0e0;color:#c44a1f;border:1px solid #e07b54;padding:9px 4px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.3;}
+.action-row button:active,.action-row button.active{background:#e07b54;color:#fff;}
+.action-row button.line-btn{background:#06c755;color:#fff;border-color:#06c755;}
+.action-row button.line-btn:active{background:#05a043;}
+
+#mode-banner{background:#fde8d8;color:#8b4513;padding:7px 12px;border-radius:6px;font-size:12px;text-align:center;margin-bottom:10px;font-weight:600;}
+#mode-banner.record-mode{background:#fff3c4;color:#7a5d20;}
 
 .section-hd{background:#fde8d8;padding:8px 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:700;color:#8b4513;}
-.emp-card{background:#fff;border-radius:0;padding:12px;border-bottom:1px solid #fde8d8;display:flex;align-items:center;gap:10px;}
+.emp-card{background:#fff;padding:12px;border-bottom:1px solid #fde8d8;display:flex;align-items:center;gap:10px;}
 .emp-card:last-child{border-radius:0 0 8px 8px;border-bottom:none;}
 .emp-card.has-entry{background:#f0fdf4;}
 .emp-card.off{background:#fafafa;opacity:.7;}
@@ -56,6 +63,7 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 .emp-time{font-size:11px;color:#666;display:block;margin-top:3px;}
 .emp-time .start-time{display:inline-block;background:#fef3c0;color:#7a5d20;padding:2px 8px;border-radius:10px;font-weight:700;font-size:11px;}
 .emp-time .ot-tag{display:inline-block;background:#fcd34d;color:#7c2d12;padding:2px 8px;border-radius:10px;font-weight:700;font-size:10px;margin-left:4px;}
+.emp-time .work-tag{display:inline-block;background:#d5edd8;color:#2e7d32;padding:2px 8px;border-radius:10px;font-weight:700;font-size:10px;margin-right:4px;}
 .emp-action{flex-shrink:0;}
 .emp-action button{background:#e07b54;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;}
 .emp-action button.set{background:#fef0e0;color:#c44a1f;border:1px solid #e07b54;}
@@ -67,6 +75,24 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 .state-OFF{background:#e74c3c;color:#fff;}
 .state-REQ_OFF{background:#fcd34d;color:#7c2d12;}
 
+/* TIME PICKER (hour + minute selects) */
+.time-picker{display:flex;gap:6px;align-items:center;}
+.time-picker select{flex:1;padding:10px 6px;border:1px solid #f4b8a0;border-radius:7px;font-size:16px;font-weight:700;text-align:center;font-family:'Sarabun',sans-serif;background:#fffdf5;color:#c44a1f;}
+.time-picker .colon{font-size:18px;font-weight:800;color:#c44a1f;}
+
+/* PERIOD LIST in record modal */
+.period-row{display:flex;align-items:center;gap:6px;padding:8px;background:#fef0e0;border-radius:8px;margin-bottom:8px;}
+.period-row .label{font-size:11px;color:#8b4513;font-weight:700;min-width:48px;}
+.period-row .time-picker{flex:1;}
+.period-row .del-btn{background:#ffebee;color:#c62828;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;}
+.period-row .del-btn:active{background:#c62828;color:#fff;}
+.period-stats{background:#e8f5e9;padding:10px 12px;border-radius:8px;margin:10px 0;font-size:13px;color:#2e7d32;display:flex;justify-content:space-between;}
+.period-stats strong{font-size:15px;}
+.period-stats .ot{color:#d97706;}
+
+.add-period-btn{width:100%;background:#fef0e0;color:#c44a1f;border:2px dashed #e07b54;padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px;}
+.add-period-btn:active{background:#e07b54;color:#fff;}
+
 /* MODAL */
 #modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:16px;}
 #modal-ov.show{display:flex;}
@@ -74,14 +100,15 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 #modal-hd{background:#e07b54;color:#fff;padding:12px 16px;font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
 #modal-cl{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
 #modal-bd{padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
-#modal-ft{padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #fde8d8;}
+#modal-ft{padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #fde8d8;flex-wrap:wrap;}
 
 /* TOAST */
 #toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;z-index:200;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
 #toast.hidden{opacity:0;}
 
-/* LINE MESSAGE PREVIEW */
-.line-msg{background:#fef9e7;border:2px solid #e07b54;border-radius:8px;padding:14px;font-size:13px;line-height:1.7;color:#3d2914;white-space:pre-wrap;font-family:'Sarabun',sans-serif;margin-bottom:12px;}
+/* LINE MESSAGE */
+#line-textarea{width:100%;min-height:220px;padding:12px;border:2px solid #06c755;border-radius:8px;font-size:13px;line-height:1.7;color:#3d2914;font-family:'Sarabun',sans-serif;background:#fef9e7;resize:vertical;}
+#line-textarea:focus{outline:none;border-color:#05a043;}
 </style>
 </head>
 <body>
@@ -104,7 +131,7 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
       <label>PIN</label>
       <input type="number" id="login-pin" maxlength="6" placeholder="ตัวเลข 4-6 หลัก" autocomplete="off">
     </div>
-    <button class="btn-pri" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <button class="btn-pri wide" onclick="doLogin()">เข้าสู่ระบบ</button>
     <p style="text-align:center;font-size:11px;color:#aaa;margin-top:12px;">หาก PIN หาย → แจ้งเจ้าของเพื่อรีเซ็ต</p>
   </div>
 </div>
@@ -113,18 +140,22 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 <div id="main">
   <div id="date-bar">
     <button class="nav-arr" onclick="shiftDate(-1)">◀</button>
-    <div style="flex:1;text-align:center;">
+    <div id="date-mid" onclick="openDatePicker()">
       <span id="date-label">—</span>
       <span id="date-sub">—</span>
     </div>
+    <input type="date" id="date-picker" onchange="onDatePicked()">
     <button class="nav-arr" onclick="shiftDate(1)">▶</button>
   </div>
 
   <div class="action-row">
     <button onclick="goToday()">📅 วันนี้</button>
-    <button onclick="goTomorrow()" class="secondary">⏭ พรุ่งนี้</button>
-    <button onclick="showLineMessage()">💬 ข้อความ Line</button>
+    <button id="btn-mode" onclick="toggleMode()">📋 ลงเวลาทำงาน</button>
+    <button onclick="goTomorrow()">⏭ พรุ่งนี้</button>
+    <button class="line-btn" onclick="showLineMessage()">💬 Line</button>
   </div>
+
+  <div id="mode-banner">🕘 โหมด: <strong>กำหนดเวลาเข้างาน</strong> (สำหรับข้อความ Line)</div>
 
   <div id="emp-section"></div>
 </div>
@@ -172,25 +203,23 @@ const beYearShort = y => String(y+543).slice(-2);
 
 // ═══════════════ STATE ═══════════════
 let recorderName = '';
-let curDate = new Date(); // selected date
-let monthData = null;     // schedule for current month
+let curDate = new Date();
+let monthData = null;
 let timeEntriesForMonth = {}; // emp|day -> entry
+let mode = 'assign'; // 'assign' or 'record'
 
 // ═══════════════ AUTH ═══════════════
 async function init(){
-  // Check existing session
   const saved = sessionStorage.getItem('clock_recorder');
   if(saved){
     try{
       const j = JSON.parse(saved);
       if(j.name && j.expires > Date.now()){
         recorderName = j.name;
-        showMain();
-        return;
+        showMain(); return;
       }
     }catch{}
   }
-  // Show login
   showLogin();
 }
 
@@ -199,7 +228,6 @@ async function showLogin(){
   document.getElementById('main').style.display='none';
   document.getElementById('btn-logout').style.display='none';
   document.getElementById('recorder-name').textContent='';
-  // Load recorder names
   try{
     const rows = await sbFetch('GET','recorder_pins?select=name&order=name.asc');
     const sel = document.getElementById('login-name');
@@ -218,11 +246,8 @@ async function doLogin(){
     if(!rows.length){ alert('ไม่พบผู้ใช้นี้'); return; }
     const hash = await sha256Hex(pin);
     if(hash !== rows[0].pin_hash){ alert('PIN ไม่ถูกต้อง'); return; }
-    // Login OK
     recorderName = name;
-    sessionStorage.setItem('clock_recorder', JSON.stringify({
-      name, expires: Date.now() + 30*24*3600*1000  // 30 days
-    }));
+    sessionStorage.setItem('clock_recorder', JSON.stringify({name, expires: Date.now()+30*24*3600*1000}));
     showMain();
   }catch(e){ console.error(e); showToast('เข้าสู่ระบบไม่สำเร็จ'); }
 }
@@ -252,16 +277,48 @@ function fmtDateLabel(d){
 function fmtDateSub(d){
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${beYearShort(d.getFullYear())}`;
 }
+function isoDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
 async function shiftDate(delta){
   const d = new Date(curDate);
-  d.setDate(d.getDate() + delta);
+  d.setDate(d.getDate()+delta);
   await loadDate(d);
 }
 async function goToday(){ await loadDate(new Date()); }
 async function goTomorrow(){
   const d = new Date(); d.setDate(d.getDate()+1);
   await loadDate(d);
+}
+function openDatePicker(){
+  const p = document.getElementById('date-picker');
+  p.value = isoDate(curDate);
+  p.style.pointerEvents='auto';
+  if(p.showPicker) p.showPicker();
+  else p.click();
+}
+async function onDatePicked(){
+  const v = document.getElementById('date-picker').value;
+  if(!v) return;
+  const [y,m,d] = v.split('-').map(Number);
+  await loadDate(new Date(y, m-1, d));
+}
+
+function toggleMode(){
+  mode = (mode==='assign') ? 'record' : 'assign';
+  const btn = document.getElementById('btn-mode');
+  const banner = document.getElementById('mode-banner');
+  if(mode==='record'){
+    btn.classList.add('active');
+    banner.classList.add('record-mode');
+    banner.innerHTML = '📋 โหมด: <strong>ลงเวลาทำงานจริง</strong> (สำหรับคำนวณ OT)';
+  } else {
+    btn.classList.remove('active');
+    banner.classList.remove('record-mode');
+    banner.innerHTML = '🕘 โหมด: <strong>กำหนดเวลาเข้างาน</strong> (สำหรับข้อความ Line)';
+  }
+  renderEmpList();
 }
 
 async function loadDate(d){
@@ -271,7 +328,6 @@ async function loadDate(d){
   document.getElementById('emp-section').innerHTML = '<p style="text-align:center;padding:20px;color:#888;">⏳ กำลังโหลด...</p>';
   const monthKey = dateKey(d);
   try{
-    // Load schedule for this month
     const rows = await sbFetch('GET',`schedule_months?key=eq.${encodeURIComponent(monthKey)}&select=key,data`);
     if(!rows.length){
       monthData = null;
@@ -281,12 +337,34 @@ async function loadDate(d){
       return;
     }
     monthData = rows[0].data;
-    // Load time entries for this month
     const entries = await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&select=*`);
     timeEntriesForMonth = {};
     entries.forEach(e => { timeEntriesForMonth[`${e.emp_name}|${e.day}`] = e; });
     renderEmpList();
   }catch(e){ console.error(e); document.getElementById('emp-section').innerHTML = '<p style="color:#c62828;padding:16px;">โหลดไม่สำเร็จ — ลองรีเฟรช</p>'; }
+}
+
+// ═══════════════ OT CALC ═══════════════
+// Rule: each work period; if >= 6 hours elapsed, deduct 60min break.
+// Total worked beyond 8 hours = OT.
+function computeOtFromPeriods(periods){
+  let totalMin = 0;
+  (periods||[]).forEach(p=>{
+    if(!p.in || !p.out) return;
+    const [h1,m1] = p.in.split(':').map(Number);
+    const [h2,m2] = p.out.split(':').map(Number);
+    let mins = (h2*60+m2) - (h1*60+m1);
+    if(mins < 0) mins += 24*60; // overnight
+    const workMin = mins >= 360 ? mins - 60 : mins;
+    totalMin += Math.max(0, workMin);
+  });
+  const otMin = Math.max(0, totalMin - 8*60);
+  return {totalMin, otMin};
+}
+function fmtHours(mins){
+  if(!mins) return '0';
+  const h = mins/60;
+  return Number(h.toFixed(2)).toString();
 }
 
 // ═══════════════ EMP LIST ═══════════════
@@ -295,33 +373,57 @@ function renderEmpList(){
   const d = curDate.getDate();
   const employees = (monthData.employees||[]).filter(e=>e.name);
 
-  const working = [];   // W or HALF (lo work)
-  const offList = [];   // OFF, REQ_OFF
+  const working = []; const offList = [];
   employees.forEach(e=>{
     const s = (e.schedule&&e.schedule[d])||'W';
     const info = {emp:e, state:s, entry: timeEntriesForMonth[`${e.name}|${d}`]||null};
     if(s==='OFF' || s==='REQ_OFF') offList.push(info);
-    else working.push(info);  // W or HALF
+    else working.push(info);
   });
 
   let html = '';
   if(working.length){
-    html += `<div class="section-hd">✅ ทำงานวันนี้ (${working.length} คน)</div>`;
+    const modeHd = mode==='record'
+      ? `📋 ลงเวลาทำงานจริง (${working.length} คน)`
+      : `✅ ทำงานวันนี้ (${working.length} คน)`;
+    html += `<div class="section-hd">${modeHd}</div>`;
     html += `<div style="background:#fff;border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);">`;
     working.forEach(info=>{
       const e = info.emp;
-      const ent = info.entry;
-      const hasStart = !!(ent && ent.work_start);
-      const cardCls = hasStart ? 'emp-card has-entry' : 'emp-card';
+      const ent = info.entry || {};
       const stateLabel = info.state==='HALF' ? '<span class="state-badge state-HALF">½ ครึ่งวัน</span>' : '';
+      let infoHtml = '';
+      let hasData = false;
+      if(mode==='record'){
+        const periods = ent.periods || [];
+        if(periods.length){
+          const stats = computeOtFromPeriods(periods);
+          const periodSummary = periods.map(p=>`${p.in||'?'}-${p.out||'?'}`).join(', ');
+          infoHtml = `<span class="emp-time"><span class="work-tag">ทำงาน ${fmtHours(stats.totalMin)} ชม.</span>${stats.otMin>0?`<span class="ot-tag">OT ${fmtHours(stats.otMin)} ชม.</span>`:''}</span>
+            <span class="emp-time" style="font-size:10px;color:#666;">${periodSummary}</span>`;
+          hasData = true;
+        } else {
+          infoHtml = '<span class="emp-time" style="color:#aaa;">— ยังไม่ลงเวลาจริง —</span>';
+        }
+      } else {
+        if(ent.work_start){
+          infoHtml = `<span class="emp-time"><span class="start-time">⏰ ${ent.work_start} น.</span></span>`;
+          hasData = true;
+        } else {
+          infoHtml = '<span class="emp-time" style="color:#aaa;">— ยังไม่กำหนดเวลา —</span>';
+        }
+      }
+      const btnLabel = hasData ? 'แก้' : 'ลง';
+      const action = mode==='record' ? `openRecordModal('${esc(e.name).replace(/'/g,"\\'")}',${d})` : `openAssignModal('${esc(e.name).replace(/'/g,"\\'")}',${d})`;
+      const cardCls = hasData ? 'emp-card has-entry' : 'emp-card';
       html += `<div class="${cardCls}">
         <div class="emp-info">
           <span class="emp-name">${esc(e.name)} ${stateLabel}</span>
           ${e.position?`<span class="emp-pos">${esc(e.position)}</span>`:''}
-          ${hasStart ? `<span class="emp-time"><span class="start-time">⏰ ${ent.work_start} น.</span>${ent.ot_min>0?`<span class="ot-tag">OT ${(ent.ot_min/60).toFixed(1)}h</span>`:''}${ent.break_min>0?`<span style="margin-left:6px;color:#888;font-size:10px;">พัก ${ent.break_min} นาที</span>`:''}</span>` : '<span class="emp-time" style="color:#aaa;">— ยังไม่ลงเวลา —</span>'}
+          ${infoHtml}
         </div>
         <div class="emp-action">
-          <button onclick="openEntryModal('${esc(e.name).replace(/'/g,"\\'")}',${d})">${hasStart?'แก้':'ลง'}</button>
+          <button onclick="${action}">${btnLabel}</button>
         </div>
       </div>`;
     });
@@ -348,50 +450,201 @@ function renderEmpList(){
   document.getElementById('emp-section').innerHTML = html;
 }
 
-// ═══════════════ ENTRY MODAL ═══════════════
-function openEntryModal(empName, day){
+// ═══════════════ TIME PICKER HELPER ═══════════════
+function timePicker(idPrefix, value){
+  const hh = (value||'').split(':')[0] || '08';
+  const mm = (value||'').split(':')[1] || '00';
+  const mmRound = mm==='30' ? '30' : '00';
+  let hOpts = '';
+  for(let h=0; h<24; h++){
+    const v = String(h).padStart(2,'0');
+    hOpts += `<option value="${v}" ${v===hh?'selected':''}>${v}</option>`;
+  }
+  return `<div class="time-picker">
+    <select id="${idPrefix}-h">${hOpts}</select>
+    <span class="colon">:</span>
+    <select id="${idPrefix}-m">
+      <option value="00" ${mmRound==='00'?'selected':''}>00</option>
+      <option value="30" ${mmRound==='30'?'selected':''}>30</option>
+    </select>
+  </div>`;
+}
+function readTimePicker(idPrefix){
+  const h = document.getElementById(idPrefix+'-h').value;
+  const m = document.getElementById(idPrefix+'-m').value;
+  return `${h}:${m}`;
+}
+
+// ═══════════════ ASSIGN MODAL (กำหนดเวลาเข้า — for Line msg) ═══════════════
+function openAssignModal(empName, day){
   const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
-  document.getElementById('modal-title').textContent = `ลงเวลา — ${empName}`;
+  document.getElementById('modal-title').textContent = `กำหนดเวลาเข้างาน — ${empName}`;
   document.getElementById('modal-bd').innerHTML = `
     <p style="font-size:12px;color:#666;margin-bottom:14px;">วันที่ ${fmtDateLabel(curDate)}</p>
     <div class="fg">
       <label>เวลาเข้างาน <span style="color:#c44a1f;">*</span></label>
-      <input type="time" id="te-start" value="${cur.work_start||''}" style="font-size:18px;font-weight:700;text-align:center;">
-      <p style="font-size:11px;color:#888;margin-top:4px;">เลิกงาน = เข้า + 8 ชม. อัตโนมัติ</p>
-    </div>
-    <div class="fg">
-      <label>OT รวมทั้งวัน (นาที)</label>
-      <input type="number" id="te-ot" value="${cur.ot_min||0}" min="0" max="720" step="15">
-      <p style="font-size:11px;color:#888;margin-top:4px;">รวมทุกช่วง — เกินเวลาเลิก + กลับมาทำงานเร่งด่วน (40฿/ชม.)</p>
+      ${timePicker('te-start', cur.work_start||'08:00')}
+      <p style="font-size:11px;color:#888;margin-top:6px;">เลิกงาน = เข้า + 8 ชม. อัตโนมัติ</p>
     </div>
     <div class="fg">
       <label>หมายเหตุ</label>
-      <input type="text" id="te-note" maxlength="100" value="${esc(cur.note||'')}" placeholder="เช่น มาสาย 15 นาที">
+      <input type="text" id="te-note" maxlength="100" value="${esc(cur.note||'')}">
     </div>
     ${cur.recorder_name?`<p style="font-size:10px;color:#888;">ล่าสุดบันทึกโดย: ${esc(cur.recorder_name)}</p>`:''}`;
   document.getElementById('modal-ft').innerHTML = `
-    ${cur.work_start?`<button class="btn-sec" style="width:auto;background:#ffebee;color:#c62828;" onclick="deleteEntry('${esc(empName).replace(/'/g,"\\'")}',${day})">ลบ</button>`:''}
-    <button class="btn-sec" style="width:auto;" onclick="closeModal()">ยกเลิก</button>
-    <button class="btn-pri" style="width:auto;" onclick="saveEntry('${esc(empName).replace(/'/g,"\\'")}',${day})">บันทึก</button>`;
+    ${cur.work_start?`<button class="btn-sec" style="background:#ffebee;color:#c62828;" onclick="deleteEntry('${esc(empName).replace(/'/g,"\\'")}',${day})">ลบ</button>`:''}
+    <button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn-pri" onclick="saveAssign('${esc(empName).replace(/'/g,"\\'")}',${day})">บันทึก</button>`;
   document.getElementById('modal-ov').classList.add('show');
-  setTimeout(()=>document.getElementById('te-start').focus(),100);
 }
 
-async function saveEntry(empName, day){
-  const start = document.getElementById('te-start').value;
-  const otMin = parseInt(document.getElementById('te-ot').value)||0;
+async function saveAssign(empName, day){
+  const start = readTimePicker('te-start');
   const note = document.getElementById('te-note').value.trim();
-  if(!start){ alert('ใส่เวลาเข้างานก่อน'); return; }
   const monthKey = dateKey(curDate);
+  const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
   try{
-    await sbFetch('POST','time_entries',[{
-      month_key: monthKey, emp_name: empName, day: day,
-      work_start: start, ot_min: otMin, break_min: 0,
-      note: note, recorder_name: recorderName
-    }],{'Prefer':'resolution=merge-duplicates,return=minimal'});
-    timeEntriesForMonth[`${empName}|${day}`] = {month_key:monthKey,emp_name:empName,day,work_start:start,ot_min:otMin,break_min:0,note,recorder_name:recorderName};
+    const body = {
+      month_key: monthKey, emp_name: empName, day,
+      work_start: start,
+      ot_min: cur.ot_min||0,
+      break_min: cur.break_min||0,
+      periods: cur.periods||[],
+      note, recorder_name: recorderName
+    };
+    await sbFetch('POST','time_entries',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+    timeEntriesForMonth[`${empName}|${day}`] = body;
     closeModal(); renderEmpList(); showToast('บันทึกแล้ว ✓');
   }catch(e){ console.error(e); showToast('⚠ บันทึกไม่สำเร็จ'); }
+}
+
+// ═══════════════ RECORD MODAL (ลงเวลาทำงานจริง — for OT) ═══════════════
+let _periodsDraft = [];
+function openRecordModal(empName, day){
+  const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
+  _periodsDraft = (cur.periods && cur.periods.length) ? JSON.parse(JSON.stringify(cur.periods))
+                : [{in: cur.work_start||'08:00', out:''}];
+  document.getElementById('modal-title').textContent = `ลงเวลาทำงาน — ${empName}`;
+  renderRecordModal(empName, day);
+  document.getElementById('modal-ov').classList.add('show');
+}
+function renderRecordModal(empName, day){
+  const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
+  let html = `<p style="font-size:12px;color:#666;margin-bottom:12px;">วันที่ ${fmtDateLabel(curDate)}</p>`;
+  _periodsDraft.forEach((p,idx)=>{
+    html += `<div class="period-row">
+      <span class="label">ช่วงที่ ${idx+1}</span>
+      <div style="flex:1;">
+        <div style="display:flex;gap:6px;align-items:center;font-size:11px;color:#8b4513;margin-bottom:4px;">
+          <span style="flex:1;">เข้า</span><span style="width:14px;"></span><span style="flex:1;">ออก</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <div style="flex:1;">${timePicker('p'+idx+'-in', p.in||'08:00')}</div>
+          <span style="font-weight:700;color:#888;">→</span>
+          <div style="flex:1;">${timePicker('p'+idx+'-out', p.out||'17:00')}</div>
+        </div>
+      </div>
+      ${_periodsDraft.length>1?`<button class="del-btn" onclick="removePeriod(${idx})">✕</button>`:''}
+    </div>`;
+  });
+  html += `<button class="add-period-btn" onclick="addPeriod()">+ เพิ่มช่วงเวลา</button>`;
+  html += `<div id="period-stats-box"></div>`;
+  html += `<div class="fg" style="margin-top:10px;">
+    <label>หมายเหตุ</label>
+    <input type="text" id="te-note" maxlength="100" value="${esc(cur.note||'')}">
+  </div>`;
+  html += `<p style="font-size:10px;color:#888;margin-top:4px;">ค่า OT คงที่ 40 บาท/ชม. · ช่วงเวลา ≥ 6 ชม. หักพักเที่ยง 1 ชม. อัตโนมัติ</p>`;
+  document.getElementById('modal-bd').innerHTML = html;
+  document.getElementById('modal-ft').innerHTML = `
+    ${(cur.periods&&cur.periods.length)?`<button class="btn-sec" style="background:#ffebee;color:#c62828;" onclick="deleteRecord('${esc(empName).replace(/'/g,"\\'")}',${day})">ลบ</button>`:''}
+    <button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn-pri" onclick="saveRecord('${esc(empName).replace(/'/g,"\\'")}',${day})">บันทึก</button>`;
+  updatePeriodStats();
+  // Wire change listeners to update stats live
+  _periodsDraft.forEach((_,idx)=>{
+    ['in','out'].forEach(io=>{
+      document.getElementById(`p${idx}-${io}-h`).onchange = ()=>{ readPeriodsDraft(); updatePeriodStats(); };
+      document.getElementById(`p${idx}-${io}-m`).onchange = ()=>{ readPeriodsDraft(); updatePeriodStats(); };
+    });
+  });
+}
+function readPeriodsDraft(){
+  _periodsDraft.forEach((p,idx)=>{
+    p.in = readTimePicker(`p${idx}-in`);
+    p.out = readTimePicker(`p${idx}-out`);
+  });
+}
+function updatePeriodStats(){
+  readPeriodsDraft();
+  const stats = computeOtFromPeriods(_periodsDraft);
+  const box = document.getElementById('period-stats-box');
+  if(!box) return;
+  box.innerHTML = `<div class="period-stats">
+    <span>ทำงานรวม: <strong>${fmtHours(stats.totalMin)} ชม.</strong></span>
+    <span class="ot">OT: <strong>${fmtHours(stats.otMin)} ชม.</strong></span>
+  </div>`;
+}
+function addPeriod(){
+  readPeriodsDraft();
+  // Default new period's in = previous out (or 18:00)
+  const last = _periodsDraft[_periodsDraft.length-1];
+  const newIn = (last && last.out) ? last.out : '18:00';
+  _periodsDraft.push({in:newIn, out:''});
+  // Need to re-render the modal body
+  const title = document.getElementById('modal-title').textContent.replace('ลงเวลาทำงาน — ','');
+  renderRecordModal(title, curDate.getDate());
+}
+function removePeriod(idx){
+  readPeriodsDraft();
+  _periodsDraft.splice(idx,1);
+  const title = document.getElementById('modal-title').textContent.replace('ลงเวลาทำงาน — ','');
+  renderRecordModal(title, curDate.getDate());
+}
+async function saveRecord(empName, day){
+  readPeriodsDraft();
+  // Validate
+  const valid = _periodsDraft.filter(p=>p.in && p.out);
+  if(!valid.length){ alert('กรอกอย่างน้อย 1 ช่วงเวลา'); return; }
+  const note = document.getElementById('te-note').value.trim();
+  const stats = computeOtFromPeriods(valid);
+  const monthKey = dateKey(curDate);
+  const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
+  try{
+    const body = {
+      month_key: monthKey, emp_name: empName, day,
+      work_start: cur.work_start || valid[0].in,
+      ot_min: stats.otMin,
+      break_min: 0,
+      periods: valid,
+      note, recorder_name: recorderName
+    };
+    await sbFetch('POST','time_entries',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+    timeEntriesForMonth[`${empName}|${day}`] = body;
+    closeModal(); renderEmpList(); showToast(`บันทึกแล้ว ✓ (OT ${fmtHours(stats.otMin)} ชม.)`);
+  }catch(e){ console.error(e); showToast('⚠ บันทึกไม่สำเร็จ'); }
+}
+async function deleteRecord(empName, day){
+  if(!confirm(`ลบเวลาทำงานจริงของ ${empName} วันนี้?`)) return;
+  const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
+  // Clear periods but keep work_start
+  const monthKey = dateKey(curDate);
+  try{
+    const body = {
+      month_key: monthKey, emp_name: empName, day,
+      work_start: cur.work_start||'',
+      ot_min: 0, break_min: 0, periods: [],
+      note: cur.note||'', recorder_name: recorderName
+    };
+    if(!cur.work_start){
+      // No work_start either → delete whole row
+      await sbFetch('DELETE',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&emp_name=eq.${encodeURIComponent(empName)}&day=eq.${day}`);
+      delete timeEntriesForMonth[`${empName}|${day}`];
+    } else {
+      await sbFetch('POST','time_entries',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+      timeEntriesForMonth[`${empName}|${day}`] = body;
+    }
+    closeModal(); renderEmpList(); showToast('ลบแล้ว');
+  }catch(e){ console.error(e); showToast('⚠ ลบไม่สำเร็จ'); }
 }
 
 async function deleteEntry(empName, day){
@@ -404,35 +657,30 @@ async function deleteEntry(empName, day){
   }catch(e){ console.error(e); showToast('⚠ ลบไม่สำเร็จ'); }
 }
 
-function closeModal(){ document.getElementById('modal-ov').classList.remove('show'); }
+function closeModal(){ document.getElementById('modal-ov').classList.remove('show'); _lineOriginal=null; }
 document.getElementById('modal-ov').onclick = e => { if(e.target===document.getElementById('modal-ov')) closeModal(); };
 
 // ═══════════════ LINE MESSAGE ═══════════════
-function showLineMessage(){
-  if(!monthData){ alert('ยังไม่มีข้อมูล'); return; }
+let _lineOriginal = null;
+function buildLineMessage(){
+  if(!monthData) return '';
   const d = curDate.getDate();
   const employees = (monthData.employees||[]).filter(e=>e.name);
-
-  // Group by work_start time
-  const byTime = {};      // "08:00" -> [names]
-  const offNames = [];
-  const noTimeNames = [];
+  const byTime = {}; const offNames = []; const noTimeNames = [];
   employees.forEach(e=>{
     const s = (e.schedule&&e.schedule[d])||'W';
     if(s==='OFF' || s==='REQ_OFF'){ offNames.push(e.name); return; }
     const ent = timeEntriesForMonth[`${e.name}|${d}`];
     if(ent && ent.work_start){
-      const key = ent.work_start;
-      if(!byTime[key]) byTime[key]=[];
-      byTime[key].push(e.name);
+      const k = ent.work_start;
+      if(!byTime[k]) byTime[k]=[];
+      byTime[k].push(e.name);
     } else {
       noTimeNames.push(e.name);
     }
   });
-
-  // Build message
   const dateSub = fmtDateSub(curDate);
-  let msg = `📝 เวลาเข้างานพนักงานวันที่\n${dateSub} ครับ\n\n`;
+  let msg = `📝 เวลาเข้างานพนักงานวันที่\n${dateSub}\n\n`;
   const times = Object.keys(byTime).sort();
   if(times.length){
     msg += `⏰ เวลา\n`;
@@ -449,26 +697,36 @@ function showLineMessage(){
   if(offNames.length){
     msg += `\n❌ ${offNames.join(', ')}`;
   }
+  return msg;
+}
 
+function showLineMessage(){
+  if(!monthData){ alert('ยังไม่มีข้อมูล'); return; }
+  _lineOriginal = buildLineMessage();
   document.getElementById('modal-title').textContent = '💬 ข้อความสำหรับ Line';
   document.getElementById('modal-bd').innerHTML = `
-    <div class="line-msg" id="line-msg-content">${esc(msg)}</div>
-    <p style="font-size:11px;color:#888;text-align:center;">คัดลอกข้อความแล้ววางในกลุ่ม Line</p>`;
+    <textarea id="line-textarea">${esc(_lineOriginal)}</textarea>
+    <p style="font-size:11px;color:#888;text-align:center;margin-top:8px;">แก้ไขข้อความได้ก่อนส่ง · ปิดแล้วกลับเปิดใหม่จะคืนค่าเดิม</p>`;
   document.getElementById('modal-ft').innerHTML = `
-    <button class="btn-sec" style="width:auto;" onclick="closeModal()">ปิด</button>
-    <button class="btn-pri" style="width:auto;" onclick="copyLineMsg('${msg.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">📋 คัดลอก</button>
-    <button class="btn-pri" style="width:auto;background:#06c755;" onclick="shareToLine('${msg.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">📲 แชร์ Line</button>`;
+    <button class="btn-sec" onclick="resetLineMsg()">↻ คืนค่าเดิม</button>
+    <button class="btn-sec" onclick="closeModal()">ปิด</button>
+    <button class="btn-pri" onclick="copyLineMsg()">📋 คัดลอก</button>
+    <button class="btn-pri" style="background:#06c755;" onclick="shareToLine()">📲 Line</button>`;
   document.getElementById('modal-ov').classList.add('show');
 }
 
-function copyLineMsg(msg){
+function resetLineMsg(){
+  document.getElementById('line-textarea').value = _lineOriginal || '';
+  showToast('↻ คืนค่าเดิมแล้ว');
+}
+function copyLineMsg(){
+  const msg = document.getElementById('line-textarea').value;
   navigator.clipboard.writeText(msg).then(()=>{
     showToast('📋 คัดลอกแล้ว — วางในกลุ่ม Line ได้เลย');
-  }).catch(()=>{
-    showToast('⚠ คัดลอกไม่สำเร็จ');
-  });
+  }).catch(()=>{ showToast('⚠ คัดลอกไม่สำเร็จ'); });
 }
-function shareToLine(msg){
+function shareToLine(){
+  const msg = document.getElementById('line-textarea').value;
   const url = 'https://line.me/R/share?text=' + encodeURIComponent(msg);
   window.open(url, '_blank');
 }
@@ -478,7 +736,7 @@ function showToast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.remove('hidden');
-  setTimeout(()=>t.classList.add('hidden'), 2200);
+  setTimeout(()=>t.classList.add('hidden'), 2400);
 }
 
 // ═══════════════ INIT ═══════════════
