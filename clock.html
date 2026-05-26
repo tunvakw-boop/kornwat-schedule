@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ลงเวลาเข้างาน — Kornwat Garden Resort</title>
+<meta name="theme-color" content="#e07b54">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:'Sarabun',sans-serif;}
+body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;color:#3d2914;}
+
+/* HEADER */
+#hdr{background:#e07b54;color:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+#hdr h1{flex:1;font-size:15px;font-weight:700;line-height:1.2;}
+#hdr h1 small{display:block;font-size:11px;font-weight:400;opacity:.9;}
+#hdr button{background:rgba(255,255,255,.22);border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600;}
+#hdr button:active{background:rgba(255,255,255,.4);}
+
+/* LOGIN */
+#login{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-box{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 4px 12px rgba(0,0,0,.12);}
+.login-box h2{color:#c44a1f;font-size:18px;text-align:center;margin-bottom:6px;}
+.login-box p{color:#8b4513;font-size:12px;text-align:center;margin-bottom:18px;}
+.fg{margin-bottom:14px;}
+.fg label{display:block;font-size:12px;color:#8b4513;margin-bottom:5px;font-weight:600;}
+.fg input,.fg select{width:100%;padding:10px 12px;border:1px solid #f4b8a0;border-radius:7px;font-size:14px;font-family:'Sarabun',sans-serif;background:#fef9e7;}
+.fg input:focus,.fg select:focus{outline:2px solid #e07b54;border-color:#e07b54;}
+.btn-pri{width:100%;background:#e07b54;color:#fff;padding:11px;border:none;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Sarabun',sans-serif;}
+.btn-pri:active{background:#c44a1f;}
+.btn-sec{width:100%;background:#e0e0e0;color:#333;padding:9px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;}
+
+/* MAIN */
+#main{flex:1;padding:12px;display:none;}
+#date-bar{background:#fff;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+.nav-arr{background:#fef0e0;border:1px solid #e07b54;color:#e07b54;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;font-weight:700;}
+#date-label{flex:1;text-align:center;font-size:14px;font-weight:700;color:#c44a1f;}
+#date-sub{font-size:11px;color:#888;display:block;font-weight:400;}
+
+.action-row{display:flex;gap:6px;margin-bottom:10px;}
+.action-row button{flex:1;background:#e07b54;color:#fff;border:none;padding:10px 8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1.3;}
+.action-row button:active{background:#c44a1f;}
+.action-row button.secondary{background:#fef0e0;color:#c44a1f;border:1px solid #e07b54;}
+
+.section-hd{background:#fde8d8;padding:8px 12px;border-radius:8px 8px 0 0;font-size:12px;font-weight:700;color:#8b4513;}
+.emp-card{background:#fff;border-radius:0;padding:12px;border-bottom:1px solid #fde8d8;display:flex;align-items:center;gap:10px;}
+.emp-card:last-child{border-radius:0 0 8px 8px;border-bottom:none;}
+.emp-card.has-entry{background:#f0fdf4;}
+.emp-card.off{background:#fafafa;opacity:.7;}
+.emp-info{flex:1;min-width:0;}
+.emp-name{font-size:14px;font-weight:700;color:#c44a1f;line-height:1.2;}
+.emp-pos{font-size:11px;color:#888;display:block;margin-top:2px;}
+.emp-time{font-size:11px;color:#666;display:block;margin-top:3px;}
+.emp-time .start-time{display:inline-block;background:#fef3c0;color:#7a5d20;padding:2px 8px;border-radius:10px;font-weight:700;font-size:11px;}
+.emp-time .ot-tag{display:inline-block;background:#fcd34d;color:#7c2d12;padding:2px 8px;border-radius:10px;font-weight:700;font-size:10px;margin-left:4px;}
+.emp-action{flex-shrink:0;}
+.emp-action button{background:#e07b54;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:700;}
+.emp-action button.set{background:#fef0e0;color:#c44a1f;border:1px solid #e07b54;}
+.emp-action button:active{background:#c44a1f;color:#fff;}
+
+.state-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px;}
+.state-W{background:#d5edd8;color:#2e7d32;}
+.state-HALF{background:#fef3c0;color:#d97706;}
+.state-OFF{background:#e74c3c;color:#fff;}
+.state-REQ_OFF{background:#fcd34d;color:#7c2d12;}
+
+/* MODAL */
+#modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:16px;}
+#modal-ov.show{display:flex;}
+#modal-box{background:#fff;border-radius:12px;width:100%;max-width:380px;overflow:hidden;max-height:90vh;display:flex;flex-direction:column;}
+#modal-hd{background:#e07b54;color:#fff;padding:12px 16px;font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+#modal-cl{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1;}
+#modal-bd{padding:14px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#modal-ft{padding:10px 14px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #fde8d8;}
+
+/* TOAST */
+#toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:9px 16px;border-radius:20px;font-size:13px;z-index:200;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#toast.hidden{opacity:0;}
+
+/* LINE MESSAGE PREVIEW */
+.line-msg{background:#fef9e7;border:2px solid #e07b54;border-radius:8px;padding:14px;font-size:13px;line-height:1.7;color:#3d2914;white-space:pre-wrap;font-family:'Sarabun',sans-serif;margin-bottom:12px;}
+</style>
+</head>
+<body>
+
+<div id="hdr">
+  <h1>⏰ ลงเวลาเข้างาน<small id="recorder-name"></small></h1>
+  <button id="btn-logout" onclick="logout()" style="display:none;">ออกจากระบบ</button>
+</div>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-box">
+    <h2>🌿 Kornwat Garden Resort</h2>
+    <p>ลงชื่อเข้าใช้ผู้บันทึกเวลา</p>
+    <div class="fg">
+      <label>ชื่อผู้บันทึก</label>
+      <select id="login-name"><option value="">-- กำลังโหลด... --</option></select>
+    </div>
+    <div class="fg">
+      <label>PIN</label>
+      <input type="number" id="login-pin" maxlength="6" placeholder="ตัวเลข 4-6 หลัก" autocomplete="off">
+    </div>
+    <button class="btn-pri" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <p style="text-align:center;font-size:11px;color:#aaa;margin-top:12px;">หาก PIN หาย → แจ้งเจ้าของเพื่อรีเซ็ต</p>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="date-bar">
+    <button class="nav-arr" onclick="shiftDate(-1)">◀</button>
+    <div style="flex:1;text-align:center;">
+      <span id="date-label">—</span>
+      <span id="date-sub">—</span>
+    </div>
+    <button class="nav-arr" onclick="shiftDate(1)">▶</button>
+  </div>
+
+  <div class="action-row">
+    <button onclick="goToday()">📅 วันนี้</button>
+    <button onclick="goTomorrow()" class="secondary">⏭ พรุ่งนี้</button>
+    <button onclick="showLineMessage()">💬 ข้อความ Line</button>
+  </div>
+
+  <div id="emp-section"></div>
+</div>
+
+<div id="modal-ov">
+  <div id="modal-box">
+    <div id="modal-hd"><span id="modal-title"></span><button id="modal-cl" onclick="closeModal()">×</button></div>
+    <div id="modal-bd"></div>
+    <div id="modal-ft"></div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script>
+// ═══════════════ CONST + CLOUD ═══════════════
+const SB_URL = 'https://xlsbabusatrlfolkrjmv.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsc2JhYnVzYXRybGZvbGtyam12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NTQyNzMsImV4cCI6MjA5MjUzMDI3M30.o8VJdMx6RFqOb1X96iJGey-NlHyx6KNFwLkYdq3_YU0';
+
+const MONTH_TH = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+const DAY_TH_FULL = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+
+async function sbFetch(method, path, body, extraHeaders){
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer '+SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': method==='POST'?'return=representation':'',
+  };
+  if(extraHeaders) Object.assign(headers, extraHeaders);
+  const res = await fetch(SB_URL+'/rest/v1/'+path, {method, headers, body: body?JSON.stringify(body):undefined});
+  if(!res.ok) throw new Error(await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+async function sha256Hex(str){
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const beYearShort = y => String(y+543).slice(-2);
+
+// ═══════════════ STATE ═══════════════
+let recorderName = '';
+let curDate = new Date(); // selected date
+let monthData = null;     // schedule for current month
+let timeEntriesForMonth = {}; // emp|day -> entry
+
+// ═══════════════ AUTH ═══════════════
+async function init(){
+  // Check existing session
+  const saved = sessionStorage.getItem('clock_recorder');
+  if(saved){
+    try{
+      const j = JSON.parse(saved);
+      if(j.name && j.expires > Date.now()){
+        recorderName = j.name;
+        showMain();
+        return;
+      }
+    }catch{}
+  }
+  // Show login
+  showLogin();
+}
+
+async function showLogin(){
+  document.getElementById('login').style.display='flex';
+  document.getElementById('main').style.display='none';
+  document.getElementById('btn-logout').style.display='none';
+  document.getElementById('recorder-name').textContent='';
+  // Load recorder names
+  try{
+    const rows = await sbFetch('GET','recorder_pins?select=name&order=name.asc');
+    const sel = document.getElementById('login-name');
+    sel.innerHTML = '<option value="">-- เลือกชื่อ --</option>' +
+      rows.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
+  }catch(e){ console.error(e); showToast('โหลดรายชื่อไม่ได้'); }
+}
+
+async function doLogin(){
+  const name = document.getElementById('login-name').value;
+  const pin = document.getElementById('login-pin').value.trim();
+  if(!name){ alert('เลือกชื่อก่อน'); return; }
+  if(!pin){ alert('ใส่ PIN'); return; }
+  try{
+    const rows = await sbFetch('GET',`recorder_pins?name=eq.${encodeURIComponent(name)}&select=pin_hash`);
+    if(!rows.length){ alert('ไม่พบผู้ใช้นี้'); return; }
+    const hash = await sha256Hex(pin);
+    if(hash !== rows[0].pin_hash){ alert('PIN ไม่ถูกต้อง'); return; }
+    // Login OK
+    recorderName = name;
+    sessionStorage.setItem('clock_recorder', JSON.stringify({
+      name, expires: Date.now() + 30*24*3600*1000  // 30 days
+    }));
+    showMain();
+  }catch(e){ console.error(e); showToast('เข้าสู่ระบบไม่สำเร็จ'); }
+}
+
+function logout(){
+  sessionStorage.removeItem('clock_recorder');
+  recorderName = '';
+  showLogin();
+}
+
+async function showMain(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('main').style.display='block';
+  document.getElementById('btn-logout').style.display='inline-block';
+  document.getElementById('recorder-name').textContent=`ผู้บันทึก: ${recorderName}`;
+  await loadDate(curDate);
+}
+
+// ═══════════════ DATE NAV ═══════════════
+function dateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function fmtDateLabel(d){
+  const dow = DAY_TH_FULL[d.getDay()];
+  return `${dow} ${d.getDate()} ${MONTH_TH[d.getMonth()+1]} ${d.getFullYear()+543}`;
+}
+function fmtDateSub(d){
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${beYearShort(d.getFullYear())}`;
+}
+
+async function shiftDate(delta){
+  const d = new Date(curDate);
+  d.setDate(d.getDate() + delta);
+  await loadDate(d);
+}
+async function goToday(){ await loadDate(new Date()); }
+async function goTomorrow(){
+  const d = new Date(); d.setDate(d.getDate()+1);
+  await loadDate(d);
+}
+
+async function loadDate(d){
+  curDate = d;
+  document.getElementById('date-label').textContent = fmtDateLabel(d);
+  document.getElementById('date-sub').textContent = fmtDateSub(d);
+  document.getElementById('emp-section').innerHTML = '<p style="text-align:center;padding:20px;color:#888;">⏳ กำลังโหลด...</p>';
+  const monthKey = dateKey(d);
+  try{
+    // Load schedule for this month
+    const rows = await sbFetch('GET',`schedule_months?key=eq.${encodeURIComponent(monthKey)}&select=key,data`);
+    if(!rows.length){
+      monthData = null;
+      document.getElementById('emp-section').innerHTML = `<div style="background:#fff;padding:20px;border-radius:8px;text-align:center;color:#888;">
+        <p style="font-size:14px;color:#c44a1f;font-weight:700;">⚠️ ยังไม่มีตารางเดือนนี้</p>
+        <p style="font-size:12px;margin-top:6px;">เจ้าของต้องสร้างตารางเดือน ${MONTH_TH[d.getMonth()+1]} ${d.getFullYear()+543} ในแอปหลักก่อน</p></div>`;
+      return;
+    }
+    monthData = rows[0].data;
+    // Load time entries for this month
+    const entries = await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&select=*`);
+    timeEntriesForMonth = {};
+    entries.forEach(e => { timeEntriesForMonth[`${e.emp_name}|${e.day}`] = e; });
+    renderEmpList();
+  }catch(e){ console.error(e); document.getElementById('emp-section').innerHTML = '<p style="color:#c62828;padding:16px;">โหลดไม่สำเร็จ — ลองรีเฟรช</p>'; }
+}
+
+// ═══════════════ EMP LIST ═══════════════
+function renderEmpList(){
+  if(!monthData) return;
+  const d = curDate.getDate();
+  const employees = (monthData.employees||[]).filter(e=>e.name);
+
+  const working = [];   // W or HALF (lo work)
+  const offList = [];   // OFF, REQ_OFF
+  employees.forEach(e=>{
+    const s = (e.schedule&&e.schedule[d])||'W';
+    const info = {emp:e, state:s, entry: timeEntriesForMonth[`${e.name}|${d}`]||null};
+    if(s==='OFF' || s==='REQ_OFF') offList.push(info);
+    else working.push(info);  // W or HALF
+  });
+
+  let html = '';
+  if(working.length){
+    html += `<div class="section-hd">✅ ทำงานวันนี้ (${working.length} คน)</div>`;
+    html += `<div style="background:#fff;border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);">`;
+    working.forEach(info=>{
+      const e = info.emp;
+      const ent = info.entry;
+      const hasStart = !!(ent && ent.work_start);
+      const cardCls = hasStart ? 'emp-card has-entry' : 'emp-card';
+      const stateLabel = info.state==='HALF' ? '<span class="state-badge state-HALF">½ ครึ่งวัน</span>' : '';
+      html += `<div class="${cardCls}">
+        <div class="emp-info">
+          <span class="emp-name">${esc(e.name)} ${stateLabel}</span>
+          ${e.position?`<span class="emp-pos">${esc(e.position)}</span>`:''}
+          ${hasStart ? `<span class="emp-time"><span class="start-time">⏰ ${ent.work_start} น.</span>${ent.ot_min>0?`<span class="ot-tag">OT ${(ent.ot_min/60).toFixed(1)}h</span>`:''}${ent.break_min>0?`<span style="margin-left:6px;color:#888;font-size:10px;">พัก ${ent.break_min} นาที</span>`:''}</span>` : '<span class="emp-time" style="color:#aaa;">— ยังไม่ลงเวลา —</span>'}
+        </div>
+        <div class="emp-action">
+          <button onclick="openEntryModal('${esc(e.name).replace(/'/g,"\\'")}',${d})">${hasStart?'แก้':'ลง'}</button>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  if(offList.length){
+    html += `<div class="section-hd">❌ วันหยุด (${offList.length} คน)</div>`;
+    html += `<div style="background:#fff;border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);">`;
+    offList.forEach(info=>{
+      const e = info.emp;
+      const label = info.state==='OFF' ? '<span class="state-badge state-OFF">OFF</span>' : '<span class="state-badge state-REQ_OFF">รีเควส</span>';
+      html += `<div class="emp-card off">
+        <div class="emp-info">
+          <span class="emp-name">${esc(e.name)} ${label}</span>
+          ${e.position?`<span class="emp-pos">${esc(e.position)}</span>`:''}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  if(!working.length && !offList.length){
+    html = '<p style="text-align:center;padding:30px;color:#888;">ยังไม่มีพนักงานในเดือนนี้</p>';
+  }
+  document.getElementById('emp-section').innerHTML = html;
+}
+
+// ═══════════════ ENTRY MODAL ═══════════════
+function openEntryModal(empName, day){
+  const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
+  document.getElementById('modal-title').textContent = `ลงเวลา — ${empName}`;
+  document.getElementById('modal-bd').innerHTML = `
+    <p style="font-size:12px;color:#666;margin-bottom:14px;">วันที่ ${fmtDateLabel(curDate)}</p>
+    <div class="fg">
+      <label>เวลาเข้างาน <span style="color:#c44a1f;">*</span></label>
+      <input type="time" id="te-start" value="${cur.work_start||''}" style="font-size:18px;font-weight:700;text-align:center;">
+      <p style="font-size:11px;color:#888;margin-top:4px;">เลิกงาน = เข้า + 8 ชม. อัตโนมัติ</p>
+    </div>
+    <div class="fg">
+      <label>OT รวมทั้งวัน (นาที)</label>
+      <input type="number" id="te-ot" value="${cur.ot_min||0}" min="0" max="720" step="15">
+      <p style="font-size:11px;color:#888;margin-top:4px;">รวมทุกช่วง — เกินเวลาเลิก + กลับมาทำงานเร่งด่วน (40฿/ชม.)</p>
+    </div>
+    <div class="fg">
+      <label>หมายเหตุ</label>
+      <input type="text" id="te-note" maxlength="100" value="${esc(cur.note||'')}" placeholder="เช่น มาสาย 15 นาที">
+    </div>
+    ${cur.recorder_name?`<p style="font-size:10px;color:#888;">ล่าสุดบันทึกโดย: ${esc(cur.recorder_name)}</p>`:''}`;
+  document.getElementById('modal-ft').innerHTML = `
+    ${cur.work_start?`<button class="btn-sec" style="width:auto;background:#ffebee;color:#c62828;" onclick="deleteEntry('${esc(empName).replace(/'/g,"\\'")}',${day})">ลบ</button>`:''}
+    <button class="btn-sec" style="width:auto;" onclick="closeModal()">ยกเลิก</button>
+    <button class="btn-pri" style="width:auto;" onclick="saveEntry('${esc(empName).replace(/'/g,"\\'")}',${day})">บันทึก</button>`;
+  document.getElementById('modal-ov').classList.add('show');
+  setTimeout(()=>document.getElementById('te-start').focus(),100);
+}
+
+async function saveEntry(empName, day){
+  const start = document.getElementById('te-start').value;
+  const otMin = parseInt(document.getElementById('te-ot').value)||0;
+  const note = document.getElementById('te-note').value.trim();
+  if(!start){ alert('ใส่เวลาเข้างานก่อน'); return; }
+  const monthKey = dateKey(curDate);
+  try{
+    await sbFetch('POST','time_entries',[{
+      month_key: monthKey, emp_name: empName, day: day,
+      work_start: start, ot_min: otMin, break_min: 0,
+      note: note, recorder_name: recorderName
+    }],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+    timeEntriesForMonth[`${empName}|${day}`] = {month_key:monthKey,emp_name:empName,day,work_start:start,ot_min:otMin,break_min:0,note,recorder_name:recorderName};
+    closeModal(); renderEmpList(); showToast('บันทึกแล้ว ✓');
+  }catch(e){ console.error(e); showToast('⚠ บันทึกไม่สำเร็จ'); }
+}
+
+async function deleteEntry(empName, day){
+  if(!confirm(`ลบเวลาของ ${empName} วันนี้?`)) return;
+  const monthKey = dateKey(curDate);
+  try{
+    await sbFetch('DELETE',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&emp_name=eq.${encodeURIComponent(empName)}&day=eq.${day}`);
+    delete timeEntriesForMonth[`${empName}|${day}`];
+    closeModal(); renderEmpList(); showToast('ลบแล้ว');
+  }catch(e){ console.error(e); showToast('⚠ ลบไม่สำเร็จ'); }
+}
+
+function closeModal(){ document.getElementById('modal-ov').classList.remove('show'); }
+document.getElementById('modal-ov').onclick = e => { if(e.target===document.getElementById('modal-ov')) closeModal(); };
+
+// ═══════════════ LINE MESSAGE ═══════════════
+function showLineMessage(){
+  if(!monthData){ alert('ยังไม่มีข้อมูล'); return; }
+  const d = curDate.getDate();
+  const employees = (monthData.employees||[]).filter(e=>e.name);
+
+  // Group by work_start time
+  const byTime = {};      // "08:00" -> [names]
+  const offNames = [];
+  const noTimeNames = [];
+  employees.forEach(e=>{
+    const s = (e.schedule&&e.schedule[d])||'W';
+    if(s==='OFF' || s==='REQ_OFF'){ offNames.push(e.name); return; }
+    const ent = timeEntriesForMonth[`${e.name}|${d}`];
+    if(ent && ent.work_start){
+      const key = ent.work_start;
+      if(!byTime[key]) byTime[key]=[];
+      byTime[key].push(e.name);
+    } else {
+      noTimeNames.push(e.name);
+    }
+  });
+
+  // Build message
+  const dateSub = fmtDateSub(curDate);
+  let msg = `📝 เวลาเข้างานพนักงานวันที่\n${dateSub} ครับ\n\n`;
+  const times = Object.keys(byTime).sort();
+  if(times.length){
+    msg += `⏰ เวลา\n`;
+    times.forEach(t=>{
+      const hh = t.split(':')[0].padStart(2,'0');
+      const mm = t.split(':')[1].padStart(2,'0');
+      const tStr = mm==='00' ? `${hh}.00` : `${hh}.${mm}`;
+      msg += `${tStr} น. ${byTime[t].join(', ')}\n`;
+    });
+  }
+  if(noTimeNames.length){
+    msg += `\n⚠️ ยังไม่กำหนดเวลา: ${noTimeNames.join(', ')}\n`;
+  }
+  if(offNames.length){
+    msg += `\n❌ ${offNames.join(', ')}`;
+  }
+
+  document.getElementById('modal-title').textContent = '💬 ข้อความสำหรับ Line';
+  document.getElementById('modal-bd').innerHTML = `
+    <div class="line-msg" id="line-msg-content">${esc(msg)}</div>
+    <p style="font-size:11px;color:#888;text-align:center;">คัดลอกข้อความแล้ววางในกลุ่ม Line</p>`;
+  document.getElementById('modal-ft').innerHTML = `
+    <button class="btn-sec" style="width:auto;" onclick="closeModal()">ปิด</button>
+    <button class="btn-pri" style="width:auto;" onclick="copyLineMsg('${msg.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">📋 คัดลอก</button>
+    <button class="btn-pri" style="width:auto;background:#06c755;" onclick="shareToLine('${msg.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">📲 แชร์ Line</button>`;
+  document.getElementById('modal-ov').classList.add('show');
+}
+
+function copyLineMsg(msg){
+  navigator.clipboard.writeText(msg).then(()=>{
+    showToast('📋 คัดลอกแล้ว — วางในกลุ่ม Line ได้เลย');
+  }).catch(()=>{
+    showToast('⚠ คัดลอกไม่สำเร็จ');
+  });
+}
+function shareToLine(msg){
+  const url = 'https://line.me/R/share?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// ═══════════════ TOAST ═══════════════
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  setTimeout(()=>t.classList.add('hidden'), 2200);
+}
+
+// ═══════════════ INIT ═══════════════
+init();
+</script>
+</body>
+</html>

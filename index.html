@@ -119,9 +119,9 @@ body{background:#fef9e7;height:100dvh;display:flex;flex-direction:column;overflo
 .leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#8b4513;font-family:'Sarabun',sans-serif;}
 .leg-dot{width:13px;height:13px;border-radius:2px;display:inline-block;border:1px solid #ddd;}
 
-/* ── SUMMARY / MANAGE scroll fix ── */
-#summary-view,#manage-view{display:block!important;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 10px 30px;height:100%;}
-#summary-view.hidden,#manage-view.hidden{display:none!important;}
+/* ── SUMMARY / PAYROLL / MANAGE scroll fix ── */
+#summary-view,#payroll-view,#manage-view{display:block!important;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 10px 30px;height:100%;}
+#summary-view.hidden,#payroll-view.hidden,#manage-view.hidden{display:none!important;}
 .sum-card{background:#fff;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.15);}
 .sum-card-hd{background:#e07b54;color:#fff;padding:8px 12px;font-size:13px;font-weight:700;}
 .sum-tbl{width:100%;border-collapse:collapse;font-size:11px;}
@@ -237,12 +237,14 @@ body.exporting #sched-tbl{width:auto!important;}
   </div>
 
   <div id="summary-view" class="view hidden"></div>
+  <div id="payroll-view" class="view hidden"></div>
   <div id="manage-view" class="view hidden"></div>
 </div>
 
 <nav id="bottom-nav">
   <button class="nb active" data-v="schedule"><span class="ni">📅</span>ตาราง</button>
   <button class="nb" data-v="summary"><span class="ni">📊</span>สรุป</button>
+  <button class="nb" data-v="payroll"><span class="ni">💰</span>เงินเดือน</button>
   <button class="nb" data-v="manage"><span class="ni">⚙️</span>จัดการ</button>
 </nav>
 
@@ -354,6 +356,52 @@ async function cloudDelete(key){
   return await sbFetch('DELETE','schedule_months?key=eq.'+encodeURIComponent(key));
 }
 
+// ── TIME ENTRIES ──
+async function cloudGetTimeEntriesForMonth(monthKey){
+  return await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&select=*`);
+}
+async function cloudUpsertTimeEntry(entry){
+  return await sbFetch('POST','time_entries',[entry],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+}
+async function cloudDeleteTimeEntry(monthKey, empName, day){
+  return await sbFetch('DELETE',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&emp_name=eq.${encodeURIComponent(empName)}&day=eq.${day}`);
+}
+
+// ── RECORDER PINS ──
+async function cloudListRecorders(){
+  return await sbFetch('GET','recorder_pins?select=id,name,created_at&order=name.asc');
+}
+async function cloudUpsertRecorder(name, pinHash){
+  return await sbFetch('POST','recorder_pins',[{name, pin_hash:pinHash}],{'Prefer':'resolution=merge-duplicates,return=minimal'});
+}
+async function cloudDeleteRecorder(name){
+  return await sbFetch('DELETE',`recorder_pins?name=eq.${encodeURIComponent(name)}`);
+}
+
+// SHA-256 hex of string (for PIN hashing)
+async function sha256Hex(str){
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Cache of time entries for current month (keyed by emp_name|day)
+let _timeEntriesCache = {}; // month_key → {empName|day → entry}
+async function loadTimeEntries(monthKey){
+  if(_timeEntriesCache[monthKey]) return _timeEntriesCache[monthKey];
+  try{
+    const rows = await cloudGetTimeEntriesForMonth(monthKey);
+    const map = {};
+    rows.forEach(r => { map[`${r.emp_name}|${r.day}`] = r; });
+    _timeEntriesCache[monthKey] = map;
+    return map;
+  }catch(e){ console.error('loadTimeEntries',e); return {}; }
+}
+function invalidateTimeEntriesCache(monthKey){
+  if(monthKey) delete _timeEntriesCache[monthKey];
+  else _timeEntriesCache = {};
+}
+
 const pushTimers = {};
 function schedulePush(k){
   setSync('syncing');
@@ -396,6 +444,7 @@ async function init(){
   const saved = localStorage.getItem(LSK);
   data = saved ? (()=>{try{return JSON.parse(saved);}catch{return clone(EXCEL);}})() : clone(EXCEL);
   ensurePositionField(data);
+  ensureSalaryField(data);
   migrateToHolidayModel(data);
   // Load meta (lastSavedAt + dirty flag)
   try{
@@ -476,6 +525,21 @@ function ensurePositionField(d){
   });
 }
 
+// Salary fields: salary (number) + salaryUnit ('month'|'day')
+function ensureSalaryField(d){
+  Object.values(d).forEach(m=>{
+    (m.employees||[]).forEach(e=>{
+      if(e.salary===undefined) e.salary='';
+      if(e.salaryUnit===undefined){
+        e.salaryUnit = (e.type==='regular') ? 'month' : 'day';
+      }
+    });
+  });
+}
+
+// Fixed OT rate (baht/hour) — same for everyone
+const OT_RATE_PER_HOUR = 40;
+
 // Migrate to new model:
 //   - m.holidaysAdded (number) = how many extra holidays added this month
 //   - emp.phCarry (number) = carryover from previous month, frozen at month creation
@@ -554,6 +618,7 @@ async function syncFromCloud(){
       const cloudData = {};
       rows.forEach(r => cloudData[r.key] = r.data);
       ensurePositionField(cloudData);
+      ensureSalaryField(cloudData);
       migrateToHolidayModel(cloudData);
       data = cloudData;
       saveLocal();
@@ -587,10 +652,11 @@ async function saveNow(){
 
 function switchView(v){
   curView = v;
-  ['schedule','summary','manage'].forEach(n => document.getElementById(n+'-view').classList.toggle('hidden', n!==v));
+  ['schedule','summary','payroll','manage'].forEach(n => document.getElementById(n+'-view').classList.toggle('hidden', n!==v));
   document.querySelectorAll('.nb').forEach(b => b.classList.toggle('active', b.dataset.v===v));
   document.getElementById('fab').classList.toggle('hidden', v!=='schedule');
   if(v==='summary') renderSummary();
+  if(v==='payroll') renderPayroll();
   if(v==='manage') renderManage();
 }
 
@@ -737,6 +803,7 @@ function tap(ei,d){
   const m=data[curKey]; if(!m) return;
   const emp=m.employees[ei]; if(!emp) return;
   if(!emp.schedule) emp.schedule={};
+  // Long-press detection isn't great on mobile; offer time-entry edit via separate button
   emp.schedule[d]=CYCLE[emp.schedule[d]||'W']||'W';
   saveLocal(); markDirty();
   const ph=new Set(m.publicHolidays||[]);
@@ -770,19 +837,32 @@ function updateRowTotals(ei){
 function editEmpName(ei){
   if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
   const e=data[curKey].employees[ei]; if(!e||!e.name) return;
-  openModal('แก้ไข ชื่อ / ตำแหน่ง',
+  const su = e.salaryUnit || (e.type==='regular'?'month':'day');
+  openModal('แก้ไข ชื่อ / ตำแหน่ง / เงินเดือน',
     `<div class="fg"><label>ชื่อพนักงาน *</label><input type="text" id="en-name" value="${esc(e.name)}" maxlength="50"></div>
      <div class="fg"><label>ตำแหน่ง</label><input type="text" id="en-pos" value="${esc(e.position||'')}" placeholder="เช่น แม่บ้าน, รปภ, เชฟ" maxlength="40"></div>
      <div class="fr">
        <div class="fg"><label>เลขที่ (No.)</label><input type="text" id="en-no" value="${esc(e.no||'')}" maxlength="5"></div>
-       <div class="fg"><label>ประเภท</label><select id="en-type">
+       <div class="fg"><label>ประเภท</label><select id="en-type" onchange="onTypeChange()">
          <option value="regular" ${e.type==='regular'?'selected':''}>ประจำ</option>
          <option value="parttime" ${e.type==='parttime'?'selected':''}>พาสไทม์</option>
          <option value="intern" ${e.type==='intern'?'selected':''}>ฝึกงาน</option></select></div>
-     </div>`,
+     </div>
+     <div class="fr">
+       <div class="fg"><label>เงินเดือน/ค่าจ้าง (บาท)</label>
+         <input type="number" id="en-salary" value="${esc(e.salary||'')}" min="0" step="1" placeholder="0"></div>
+       <div class="fg"><label>หน่วย</label><select id="en-sunit">
+         <option value="month" ${su==='month'?'selected':''}>รายเดือน</option>
+         <option value="day" ${su==='day'?'selected':''}>รายวัน</option></select></div>
+     </div>
+     <p style="font-size:11px;color:#666;margin-top:-4px;">ค่า OT คงที่ ${OT_RATE_PER_HOUR} บาท/ชม. ทุกคน</p>`,
     `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
      <button class="btn-pri" onclick="saveEmpName(${ei})">บันทึก</button>`);
   setTimeout(()=>document.getElementById('en-name').focus(),100);
+}
+function onTypeChange(){
+  const t = document.getElementById('en-type').value;
+  document.getElementById('en-sunit').value = (t==='regular') ? 'month' : 'day';
 }
 function saveEmpName(ei){
   const name = document.getElementById('en-name').value.trim();
@@ -792,6 +872,9 @@ function saveEmpName(ei){
   e.position = document.getElementById('en-pos').value.trim();
   e.no = document.getElementById('en-no').value.trim();
   e.type = document.getElementById('en-type').value;
+  const sv = document.getElementById('en-salary').value;
+  e.salary = sv===''?'':String(Math.max(0, parseFloat(sv)||0));
+  e.salaryUnit = document.getElementById('en-sunit').value;
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
 }
 
@@ -897,6 +980,60 @@ function savePhCarry(ei){
   const v = document.getElementById('pc-inp').value;
   data[curKey].employees[ei].phCarry = Math.max(0, parseFloat(v)||0);
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── Time-entry editor (for owner — main app) ──
+// Accessed from payroll tab or via a dedicated button per day
+async function editTimeEntry(empName, day){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const monthKey = curKey;
+  const cache = await loadTimeEntries(monthKey);
+  const cur = cache[`${empName}|${day}`] || {};
+  openModal(`ลงเวลา — ${empName} วันที่ ${day}`,
+    `<div class="fr">
+       <div class="fg"><label>เวลาเข้า</label>
+         <input type="time" id="te-start" value="${cur.work_start||''}"></div>
+       <div class="fg"><label>พักเที่ยง (นาที)</label>
+         <input type="number" id="te-break" value="${cur.break_min||0}" min="0" max="180" step="15"></div>
+     </div>
+     <div class="fg"><label>OT รวมทั้งวัน (นาที)</label>
+       <input type="number" id="te-ot" value="${cur.ot_min||0}" min="0" max="720" step="15">
+       <p style="font-size:11px;color:#666;margin-top:4px;">รวมทุกช่วงเวลา OT (เช่น อยู่เกินตอนเย็น 30 นาที + กลับมาตอนค่ำ 90 นาที = 120)</p>
+     </div>
+     <div class="fg"><label>หมายเหตุ</label>
+       <textarea id="te-note" maxlength="200">${esc(cur.note||'')}</textarea></div>
+     ${cur.recorder_name?`<p style="font-size:10px;color:#888;margin-top:-4px;">ล่าสุดบันทึกโดย: ${esc(cur.recorder_name)}</p>`:''}`,
+    `${cur.work_start?`<button class="btn-sec" style="background:#ffebee;color:#c62828;" onclick="deleteTimeEntry('${esc(empName)}',${day})">ลบ</button>`:''}
+     <button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="saveTimeEntry('${esc(empName)}',${day})">บันทึก</button>`);
+}
+async function saveTimeEntry(empName, day){
+  const start = document.getElementById('te-start').value;
+  const otMin = parseInt(document.getElementById('te-ot').value)||0;
+  const breakMin = parseInt(document.getElementById('te-break').value)||0;
+  const note = document.getElementById('te-note').value.trim();
+  if(!start){ alert('ใส่เวลาเข้างานก่อน'); return; }
+  setSync('syncing');
+  try{
+    await cloudUpsertTimeEntry({
+      month_key: curKey, emp_name: empName, day: day,
+      work_start: start, ot_min: otMin, break_min: breakMin,
+      note: note, recorder_name: 'owner'
+    });
+    invalidateTimeEntriesCache(curKey);
+    setSync('ok'); closeModal(); showToast('บันทึกแล้ว');
+    if(curView==='payroll') renderPayroll();
+  }catch(e){ console.error(e); setSync('error'); showToast('⚠ บันทึกไม่สำเร็จ'); }
+}
+async function deleteTimeEntry(empName, day){
+  if(!confirm(`ลบข้อมูลลงเวลา ${empName} วันที่ ${day}?`)) return;
+  setSync('syncing');
+  try{
+    await cloudDeleteTimeEntry(curKey, empName, day);
+    invalidateTimeEntriesCache(curKey);
+    setSync('ok'); closeModal(); showToast('ลบแล้ว');
+    if(curView==='payroll') renderPayroll();
+  }catch(e){ console.error(e); setSync('error'); showToast('⚠ ลบไม่สำเร็จ'); }
 }
 
 // ── Read-only info popup for auto-calculated ใช้วันหยุด ──
@@ -1011,6 +1148,230 @@ function addNextMonth(){
 }
 
 // ═══════════════════ SUMMARY ═══════════════════
+// ═══════════════════ PAYROLL ═══════════════════
+async function renderPayroll(){
+  const m=data[curKey]; if(!m){ document.getElementById('payroll-view').innerHTML='<p>เลือกเดือนก่อน</p>'; return; }
+  document.getElementById('payroll-view').innerHTML = `<p style="text-align:center;color:#888;padding:20px;">⏳ กำลังโหลดข้อมูลลงเวลา...</p>`;
+  const entries = await loadTimeEntries(curKey);
+
+  // Build per-employee summary
+  const rows = [];
+  m.employees.forEach(emp=>{
+    if(!emp.name) return;
+    let daysWorked=0, totalOtMin=0, totalBreakMin=0;
+    for(let d=1; d<=m.days; d++){
+      const e = entries[`${emp.name}|${d}`];
+      if(e && e.work_start){
+        daysWorked++;
+        totalOtMin += +e.ot_min||0;
+        totalBreakMin += +e.break_min||0;
+      }
+    }
+    const salary = parseFloat(emp.salary)||0;
+    const su = emp.salaryUnit || (emp.type==='regular'?'month':'day');
+    const basePay = (su==='month') ? salary : salary * daysWorked;
+    const otHours = totalOtMin / 60;
+    const otPay = otHours * OT_RATE_PER_HOUR;
+    const total = basePay + otPay;
+    rows.push({emp, daysWorked, totalOtMin, otHours, basePay, otPay, total, su, salary});
+  });
+
+  const sumBase = rows.reduce((s,r)=>s+r.basePay, 0);
+  const sumOt   = rows.reduce((s,r)=>s+r.otPay,   0);
+  const sumTotal= rows.reduce((s,r)=>s+r.total,   0);
+
+  let html = `<div class="sum-card">
+    <div class="sum-card-hd">💰 เงินเดือนประจำเดือน ${m.label}</div>
+    <table class="sum-tbl" id="payroll-tbl">
+      <thead><tr>
+        <th style="text-align:left;">ชื่อพนักงาน</th>
+        <th>วัน</th>
+        <th>OT (ชม.)</th>
+        <th>ฐาน (บาท)</th>
+        <th>OT (บาท)</th>
+        <th>รวม (บาท)</th>
+        <th></th>
+      </tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const e = r.emp;
+    const unit = r.su==='month' ? `เดือนละ ${fmt$(r.salary)}` : `${fmt$(r.salary)}/วัน × ${r.daysWorked}`;
+    html += `<tr>
+      <td><span style="color:#e07b54;font-weight:700;">${esc(e.name)}</span><br>
+        <span class="badge ${BADGE_CLS[e.type]||'b-reg'}">${TYPE_LBL[e.type]||''}</span>
+        ${e.position?`<br><span style="font-size:9px;color:#888;">${esc(e.position)}</span>`:''}
+        <br><span style="font-size:9px;color:#666;">${unit}</span></td>
+      <td style="text-align:center;color:#1565c0;">${r.daysWorked}</td>
+      <td style="text-align:center;color:#d97706;">${fmtNum(r.otHours)}</td>
+      <td style="text-align:right;color:#2e7d32;font-weight:600;">${fmt$(r.basePay)}</td>
+      <td style="text-align:right;color:#d97706;font-weight:600;">${fmt$(r.otPay)}</td>
+      <td style="text-align:right;color:#c44a1f;font-weight:800;">${fmt$(r.total)}</td>
+      <td style="text-align:center;display:flex;gap:3px;justify-content:center;">
+        <button class="btn-sm btn-edit" title="ดู/แก้รายวัน" onclick="showEmpDailyDetail('${esc(r.emp.name)}')">✏</button>
+        <button class="btn-sm btn-edit" title="ส่งออกสลิป" onclick="exportPayslip(${i})">📄</button>
+      </td>
+    </tr>`;
+  });
+  // Footer totals
+  html += `<tr style="background:#fef3e2;font-weight:800;">
+    <td style="color:#8b4513;">รวมทั้งหมด (${rows.length} คน)</td>
+    <td></td><td></td>
+    <td style="text-align:right;color:#2e7d32;">${fmt$(sumBase)}</td>
+    <td style="text-align:right;color:#d97706;">${fmt$(sumOt)}</td>
+    <td style="text-align:right;color:#c44a1f;">${fmt$(sumTotal)}</td>
+    <td></td>
+  </tr>`;
+  html += `</tbody></table></div>`;
+
+  // Action buttons
+  html += `<div style="display:flex;gap:8px;margin-bottom:10px;">
+    <button class="btn-pri" onclick="exportPayrollPNG()" style="flex:1;">📷 บันทึกรูป</button>
+    <button class="btn-pri" onclick="exportPayrollPDF()" style="flex:1;">📄 บันทึก PDF</button>
+  </div>`;
+
+  // Notes
+  html += `<div class="sum-card"><div class="sum-card-hd">ℹ️ กติกาคำนวณ</div>
+    <div style="padding:12px;font-size:12px;line-height:1.7;color:#5d4037;">
+      • พนักงานประจำ: ฐาน = เงินเดือน (เต็มเดือน ไม่หักขาด)<br>
+      • พนักงานรายวัน: ฐาน = ค่าจ้าง × วันที่มีลงเวลาเข้างาน<br>
+      • ค่า OT = (นาที OT รวม ÷ 60) × <strong>${OT_RATE_PER_HOUR} บาท/ชม.</strong> (คงที่ทุกคน)<br>
+      • รวมสุทธิ = ฐาน + OT (ไม่มีหักลด)
+    </div>
+  </div>`;
+
+  // Save data for export functions
+  window._payrollRows = rows;
+  window._payrollMonth = m;
+  document.getElementById('payroll-view').innerHTML = html;
+}
+
+function fmt$(n){
+  return Number(n||0).toLocaleString('th-TH', {maximumFractionDigits:2});
+}
+
+// Export full payroll table as PNG
+async function exportPayrollPNG(){
+  await exportNodeAsImage('payroll-tbl', `เงินเดือน-${(window._payrollMonth||{}).label||''}.png`);
+}
+async function exportPayrollPDF(){
+  await exportNodeAsPdf('payroll-tbl', `เงินเดือน-${(window._payrollMonth||{}).label||''}.pdf`);
+}
+async function exportPayslip(rowIdx){
+  const r = (window._payrollRows||[])[rowIdx]; if(!r) return;
+  const m = window._payrollMonth;
+  // Build a standalone payslip card off-screen
+  const host = document.createElement('div');
+  host.id = '__payslip';
+  host.style.cssText='position:fixed;left:-99999px;top:0;width:380px;background:#fffdf5;padding:24px;font-family:Sarabun,sans-serif;color:#3d2914;border:2px solid #d99672;border-radius:10px;';
+  host.innerHTML = `
+    <div style="text-align:center;margin-bottom:14px;">
+      <h2 style="color:#c44a1f;font-size:18px;font-weight:800;margin:0;">Kornwat Garden Resort</h2>
+      <p style="color:#8b4513;font-size:13px;margin-top:3px;">สลิปเงินเดือน — ${m.label}</p>
+    </div>
+    <div style="background:#fde8d8;padding:10px 14px;border-radius:6px;margin-bottom:12px;">
+      <div style="font-size:14px;color:#c44a1f;font-weight:700;">${esc(r.emp.name)}</div>
+      <div style="font-size:11px;color:#666;">${esc(r.emp.position||'')} · ${TYPE_LBL[r.emp.type]||''}</div>
+    </div>
+    <table style="width:100%;font-size:13px;border-collapse:collapse;">
+      <tr><td style="padding:6px 0;color:#666;">วันที่ทำงาน</td><td style="text-align:right;font-weight:700;">${r.daysWorked} วัน</td></tr>
+      <tr><td style="padding:6px 0;color:#666;">OT</td><td style="text-align:right;font-weight:700;">${fmtNum(r.otHours)} ชม.</td></tr>
+      <tr style="border-top:1px dashed #d99672;"><td style="padding:8px 0;color:#2e7d32;font-weight:600;">ฐาน${r.su==='month'?'รายเดือน':'รายวัน'}</td><td style="text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)} ฿</td></tr>
+      <tr><td style="padding:6px 0;color:#d97706;font-weight:600;">ค่า OT (${OT_RATE_PER_HOUR}฿/ชม.)</td><td style="text-align:right;color:#d97706;font-weight:700;">${fmt$(r.otPay)} ฿</td></tr>
+      <tr style="border-top:2px solid #c44a1f;"><td style="padding:10px 0;color:#c44a1f;font-size:15px;font-weight:800;">รวมสุทธิ</td><td style="text-align:right;color:#c44a1f;font-size:17px;font-weight:800;">${fmt$(r.total)} ฿</td></tr>
+    </table>
+    <p style="text-align:center;font-size:10px;color:#aaa;margin-top:14px;">สลิปออกจากระบบ ${new Date().toLocaleDateString('th-TH')}</p>`;
+  document.body.appendChild(host);
+  try{
+    await new Promise(r=>setTimeout(r,60));
+    const canvas = await html2canvas(host, {backgroundColor:'#fffdf5', scale:2.5, useCORS:true, allowTaint:true, logging:false});
+    const fname = `สลิป-${r.emp.name}-${m.label}.png`;
+    canvas.toBlob(async (blob)=>{
+      if(isMobile() && navigator.share && navigator.canShare){
+        const file = new File([blob], fname, {type:'image/png'});
+        if(navigator.canShare({files:[file]})){
+          try{ await navigator.share({files:[file], title:fname}); showToast('📷 พร้อมแชร์'); return; }catch(e){ if(e.name==='AbortError') return; }
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download=fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
+      showToast('📷 บันทึกสลิปแล้ว');
+    },'image/png',0.95);
+  }finally{
+    document.body.removeChild(host);
+  }
+}
+
+// Show daily breakdown for one employee — owner can edit time entries day-by-day
+async function showEmpDailyDetail(empName){
+  const m = data[curKey]; if(!m) return;
+  const entries = await loadTimeEntries(curKey);
+  const empIdx = m.employees.findIndex(e=>e.name===empName);
+  const emp = m.employees[empIdx];
+  let rows='';
+  for(let d=1; d<=m.days; d++){
+    const s = (emp.schedule&&emp.schedule[d])||'W';
+    const e = entries[`${empName}|${d}`] || {};
+    const isWorking = (s==='W' || s==='HALF');
+    const wdLabel = DAY_TH[dow(m.year,m.month,d)];
+    rows += `<tr style="border-bottom:1px solid #fde8d8;${!isWorking?'background:#fef0f5;color:#888;':''}">
+      <td style="padding:6px 4px;text-align:center;font-weight:700;width:30px;">${d}</td>
+      <td style="padding:6px 4px;font-size:10px;width:30px;">${wdLabel}</td>
+      <td style="padding:6px 4px;width:60px;">${s==='OFF'?'<span style="color:#c0392b;">OFF</span>':s==='HALF'?'<span style="color:#d97706;">½</span>':s==='REQ_OFF'?'<span style="color:#7c2d12;">รีเควส</span>':'<span style="color:#2e7d32;">W</span>'}</td>
+      <td style="padding:6px 4px;font-size:11px;">${e.work_start||'<span style="color:#ccc;">—</span>'}</td>
+      <td style="padding:6px 4px;font-size:11px;text-align:right;">${e.ot_min?fmtNum(e.ot_min/60)+' ชม.':'<span style="color:#ccc;">—</span>'}</td>
+      <td style="padding:4px;text-align:center;">${isWorking?`<button class="btn-sm btn-edit" style="padding:3px 8px;font-size:11px;" onclick="editTimeEntry('${esc(empName)}',${d})">แก้</button>`:''}</td>
+    </tr>`;
+  }
+  openModal(`ลงเวลา — ${empName}`,
+    `<div style="max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
+       <table style="width:100%;border-collapse:collapse;font-size:12px;">
+         <thead style="position:sticky;top:0;background:#fde8d8;color:#8b4513;font-weight:700;">
+           <tr><th style="padding:6px 4px;">วัน</th><th></th><th>สถานะ</th><th>เข้า</th><th style="text-align:right;">OT</th><th></th></tr>
+         </thead>
+         <tbody>${rows}</tbody>
+       </table>
+     </div>`,
+    `<button class="btn-pri" onclick="closeModal()">ปิด</button>`);
+}
+
+async function exportNodeAsImage(nodeId, fname){
+  const node = document.getElementById(nodeId); if(!node) return;
+  showToast('⏳ กำลังสร้างรูป...');
+  const canvas = await html2canvas(node, {backgroundColor:'#fff', scale:2, useCORS:true, allowTaint:true, logging:false});
+  canvas.toBlob(async (blob)=>{
+    if(isMobile() && navigator.share && navigator.canShare){
+      const file = new File([blob], fname, {type:'image/png'});
+      if(navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file], title:fname}); showToast('📷 พร้อมแชร์'); return; }catch(e){ if(e.name==='AbortError') return; }
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+    showToast('📷 บันทึกแล้ว');
+  },'image/png',0.95);
+}
+async function exportNodeAsPdf(nodeId, fname){
+  const node = document.getElementById(nodeId); if(!node) return;
+  if(!window.jspdf){ showToast('⚠ jspdf ไม่พร้อม'); return; }
+  showToast('⏳ กำลังสร้าง PDF...');
+  const canvas = await html2canvas(node, {backgroundColor:'#fff', scale:2, useCORS:true, allowTaint:true, logging:false});
+  const {jsPDF} = window.jspdf;
+  const w = canvas.width, h = canvas.height;
+  const orient = w>h ? 'landscape' : 'portrait';
+  const pdf = new jsPDF({orientation:orient, unit:'pt', format:'a4'});
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 24;
+  const scale = Math.min((pageW-margin*2)/w, (pageH-margin*2)/h);
+  const drawW = w*scale, drawH = h*scale;
+  pdf.addImage(canvas.toDataURL('image/png'),'PNG', (pageW-drawW)/2, (pageH-drawH)/2, drawW, drawH);
+  pdf.save(fname);
+  showToast('📄 บันทึก PDF แล้ว');
+}
+
 function renderSummary(){
   const m=data[curKey]; if(!m) return;
   let html=`<div class="sum-card">
@@ -1106,6 +1467,24 @@ function renderManage(){
         <button class="btn-pri" onclick="showEditHolidayModal()" style="font-size:12px;padding:7px 14px;">แก้ไขวันหยุด</button>
       </div></div>`;
 
+    // Recorder management
+    html+=`<div class="mg-sec">
+      <div class="mg-hd"><span>🔑 ผู้บันทึกเวลา (clock.html)</span>
+        <button class="btn-sm btn-add" onclick="showAddRecorderModal()">+ เพิ่ม</button></div>
+      <div class="mg-body" id="recorder-list">
+        <p style="font-size:11px;color:#888;">กำลังโหลด...</p>
+      </div></div>`;
+    setTimeout(loadRecordersList, 100);
+
+    html+=`<div class="mg-sec">
+      <div class="mg-hd">🔗 ลิ้งก์แอปลงเวลา (สำหรับผู้บันทึก)</div>
+      <div class="mg-body">
+        <p style="font-size:11px;color:#666;margin-bottom:8px;">ส่งลิ้งก์นี้ให้ผู้บันทึก:</p>
+        <input type="text" readonly value="https://tunvakw-boop.github.io/kornwat-schedule/clock.html"
+          onclick="this.select();" style="width:100%;padding:8px;border:1px solid #f4b8a0;border-radius:5px;font-size:11px;background:#fef9e7;font-family:monospace;">
+        <button class="btn-pri" onclick="navigator.clipboard.writeText('https://tunvakw-boop.github.io/kornwat-schedule/clock.html').then(()=>showToast('คัดลอกแล้ว'))" style="margin-top:8px;font-size:12px;padding:7px 14px;">📋 คัดลอกลิ้งก์</button>
+      </div></div>`;
+
     html+=`<div class="mg-sec">
       <div class="mg-hd">☁️ ข้อมูลคลาวด์</div>
       <div class="mg-body">
@@ -1135,6 +1514,76 @@ function delEmp(ei){
   saveLocal(); markDirty(); render(); renderManage(); showToast('ลบพนักงานแล้ว');
 }
 
+// ── RECORDER PIN MANAGEMENT ──
+async function loadRecordersList(){
+  const el = document.getElementById('recorder-list'); if(!el) return;
+  try{
+    const rows = await cloudListRecorders();
+    if(!rows.length){
+      el.innerHTML = '<p style="font-size:11px;color:#888;">ยังไม่มีผู้บันทึก — กด "+ เพิ่ม" เพื่อสร้าง</p>';
+      return;
+    }
+    el.innerHTML = rows.map(r=>`
+      <div class="mg-item">
+        <div><strong style="font-size:12px;color:#e07b54;">${esc(r.name)}</strong>
+          <span style="font-size:10px;color:#888;display:block;">สร้างเมื่อ ${new Date(r.created_at).toLocaleDateString('th-TH')}</span></div>
+        <div style="display:flex;gap:5px;">
+          <button class="btn-sm btn-edit" onclick="showResetPinModal('${esc(r.name).replace(/'/g,"\\'")}')">เปลี่ยน PIN</button>
+          <button class="btn-sm btn-del" onclick="delRecorder('${esc(r.name).replace(/'/g,"\\'")}')">ลบ</button>
+        </div></div>`).join('');
+  }catch(e){
+    console.error(e);
+    el.innerHTML = '<p style="font-size:11px;color:#c62828;">โหลดไม่สำเร็จ</p>';
+  }
+}
+
+function showAddRecorderModal(){
+  openModal('เพิ่มผู้บันทึกเวลา',
+    `<div class="fg"><label>ชื่อ *</label><input type="text" id="rc-name" maxlength="30" placeholder="เช่น นกดุล"></div>
+     <div class="fg"><label>PIN 4-6 หลัก *</label><input type="number" id="rc-pin" maxlength="6" placeholder="ตัวเลข 4-6 หลัก"></div>
+     <p style="font-size:11px;color:#666;">PIN จะถูกเก็บแบบ hash ใน Supabase</p>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="addRecorder()">เพิ่ม</button>`);
+  setTimeout(()=>document.getElementById('rc-name').focus(),100);
+}
+async function addRecorder(){
+  const name = document.getElementById('rc-name').value.trim();
+  const pin = document.getElementById('rc-pin').value.trim();
+  if(!name){ alert('ใส่ชื่อก่อน'); return; }
+  if(!pin || pin.length<4){ alert('PIN ต้อง 4-6 หลัก'); return; }
+  setSync('syncing');
+  try{
+    const hash = await sha256Hex(pin);
+    await cloudUpsertRecorder(name, hash);
+    setSync('ok'); closeModal(); loadRecordersList(); showToast('เพิ่มผู้บันทึกแล้ว');
+  }catch(e){ console.error(e); setSync('error'); showToast('⚠ เพิ่มไม่สำเร็จ'); }
+}
+function showResetPinModal(name){
+  openModal(`เปลี่ยน PIN — ${name}`,
+    `<div class="fg"><label>PIN ใหม่ 4-6 หลัก *</label><input type="number" id="rc-newpin" maxlength="6"></div>`,
+    `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
+     <button class="btn-pri" onclick="resetPin('${name.replace(/'/g,"\\'")}')">บันทึก</button>`);
+  setTimeout(()=>document.getElementById('rc-newpin').focus(),100);
+}
+async function resetPin(name){
+  const pin = document.getElementById('rc-newpin').value.trim();
+  if(!pin || pin.length<4){ alert('PIN ต้อง 4-6 หลัก'); return; }
+  setSync('syncing');
+  try{
+    const hash = await sha256Hex(pin);
+    await cloudUpsertRecorder(name, hash);
+    setSync('ok'); closeModal(); showToast('เปลี่ยน PIN แล้ว');
+  }catch(e){ console.error(e); setSync('error'); showToast('⚠ เปลี่ยนไม่สำเร็จ'); }
+}
+async function delRecorder(name){
+  if(!confirm(`ลบผู้บันทึก "${name}"?`)) return;
+  setSync('syncing');
+  try{
+    await cloudDeleteRecorder(name);
+    setSync('ok'); loadRecordersList(); showToast('ลบแล้ว');
+  }catch(e){ console.error(e); setSync('error'); showToast('⚠ ลบไม่สำเร็จ'); }
+}
+
 // Move employee up/down — swaps positions of named employees only
 function moveEmp(ei, dir){
   if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
@@ -1151,7 +1600,7 @@ function moveEmp(ei, dir){
 }
 async function resetAll(){
   if(!confirm('รีเซ็ตข้อมูลทั้งหมด? การแก้ไขจะหายไป')) return;
-  data=clone(EXCEL); ensurePositionField(data); migrateToHolidayModel(data);
+  data=clone(EXCEL); ensurePositionField(data); ensureSalaryField(data); migrateToHolidayModel(data);
   saveLocal();
   await pushAllNow();
   render(); renderManage();
@@ -1170,30 +1619,46 @@ function showAddEmpModal(){
   openModal('เพิ่มพนักงาน',
     `<div class="fg"><label>ชื่อพนักงาน *</label><input type="text" id="np-name" maxlength="50" placeholder="ชื่อ"></div>
      <div class="fg"><label>ตำแหน่ง</label><input type="text" id="np-pos" placeholder="เช่น แม่บ้าน, รปภ, เชฟ" maxlength="40"></div>
-     <div class="fr"><div class="fg"><label>ประเภท</label><select id="np-type">
+     <div class="fr"><div class="fg"><label>ประเภท</label><select id="np-type" onchange="onNpTypeChange()">
        <option value="regular">ประจำ</option>
        <option value="parttime">พาสไทม์</option>
        <option value="intern">ฝึกงาน</option></select></div>
      <div class="fg"><label>เลขที่</label><input type="text" id="np-no" maxlength="5" placeholder="ว่างได้"></div></div>
+     <div class="fr">
+       <div class="fg"><label>เงินเดือน/ค่าจ้าง (บาท)</label>
+         <input type="number" id="np-salary" min="0" step="1" placeholder="0"></div>
+       <div class="fg"><label>หน่วย</label><select id="np-sunit">
+         <option value="month">รายเดือน</option>
+         <option value="day">รายวัน</option></select></div>
+     </div>
      <div class="fr"><div class="fg"><label>วันหยุดคงเหลือ</label><input type="number" id="np-ph" min="0" max="30" step="0.5" placeholder="0"></div>
      <div class="fg"><label>สถานะเริ่มต้น</label><select id="np-def">
        <option value="W">ทำงานทุกวัน</option>
-       <option value="OFF">หยุดทุกวัน</option></select></div></div>`,
+       <option value="OFF">หยุดทุกวัน</option></select></div></div>
+     <p style="font-size:11px;color:#666;margin-top:-4px;">ค่า OT คงที่ ${OT_RATE_PER_HOUR} บาท/ชม.</p>`,
     `<button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
      <button class="btn-pri" onclick="addEmp()">เพิ่ม</button>`);
   setTimeout(()=>document.getElementById('np-name').focus(),100);
+}
+function onNpTypeChange(){
+  const t = document.getElementById('np-type').value;
+  document.getElementById('np-sunit').value = (t==='regular') ? 'month' : 'day';
 }
 function addEmp(){
   const name=document.getElementById('np-name').value.trim(); if(!name){alert('ใส่ชื่อก่อน');return;}
   const m=data[curKey]; const sched={};
   const def=document.getElementById('np-def').value;
   for(let d=1;d<=m.days;d++) sched[d]=def;
+  const sv = document.getElementById('np-salary').value;
+  const su = document.getElementById('np-sunit').value;
   m.employees.push({
     no:document.getElementById('np-no').value.trim(),
     name, position:document.getElementById('np-pos').value.trim(),
     type:document.getElementById('np-type').value,
-    schedule:sched,vacUsed:'',phTotal:'',
-    phRemain:document.getElementById('np-ph').value||'0',remark:''
+    salary: sv===''?'':String(Math.max(0,parseFloat(sv)||0)),
+    salaryUnit: su,
+    schedule:sched, phCarry:0, vacUsed:'', phTotal:'',
+    phRemain:document.getElementById('np-ph').value||'0', remark:''
   });
   saveLocal(); markDirty(); closeModal(); render(); if(curView==='manage') renderManage(); showToast('เพิ่มแล้ว');
 }
