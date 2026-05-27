@@ -887,6 +887,9 @@ async function renderReport(){
       lastOut = periods[periods.length-1].out || '';
       const stats = computeOtFromPeriods(periods);
       workMin = stats.totalMin;
+    } else if(entry.work_start){
+      // Assigned but no actual periods recorded yet — show schedule time as fallback
+      firstIn = entry.work_start;
     }
     const otMin = +entry.ot_min || 0;
     const startEnd = entry.work_start ? `${entry.work_start}-${addHours(entry.work_start, 8)}` : '';
@@ -895,8 +898,10 @@ async function renderReport(){
     if(sched==='OFF') statusNote='OFF';
     else if(sched==='REQ_OFF') statusNote='ลา';
     else if(sched==='HALF') statusNote='½';
-    rows.push({date:new Date(d), day, mk, monthInfo, sched, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||''});
-    if(periods.length){ daysCame++; sumWorkMin += workMin; sumOtMin += otMin; }
+    // Unified count: came to work = has work_start OR periods (same as main app payroll)
+    const hasEntry = !!(entry.work_start || periods.length>0);
+    rows.push({date:new Date(d), day, mk, monthInfo, sched, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||'', hasEntry});
+    if(hasEntry){ daysCame++; sumWorkMin += workMin; sumOtMin += otMin; }
     if(sched==='OFF' || sched==='REQ_OFF') daysOff++;
   }
 
@@ -937,7 +942,7 @@ async function renderReport(){
     }
     const dowTH = ['อา','จ','อ','พ','พฤ','ศ','ส'][r.date.getDay()];
     const dateLabel = `${String(r.day).padStart(2,'0')}/${String(r.date.getMonth()+1).padStart(2,'0')}/${beYearShort(r.date.getFullYear())} (${dowTH})`;
-    const rowCls = (r.sched==='OFF'||r.sched==='REQ_OFF') ? 'off-row' : (r.periods.length ? 'has-entry' : '');
+    const rowCls = (r.sched==='OFF'||r.sched==='REQ_OFF') ? 'off-row' : (r.hasEntry ? 'has-entry' : '');
     card += `<tr class="${rowCls}" onclick="editReportRow('${esc(emp.name).replace(/'/g,"\\'")}','${r.mk}',${r.day})">
       <td class="date-cell">${dateLabel}</td>
       <td>${esc(r.startEnd) || (r.statusNote==='OFF'?'<span style="color:#c0392b;">OFF</span>':r.statusNote==='ลา'?'<span style="color:#7c2d12;">ลา</span>':'—')}</td>
