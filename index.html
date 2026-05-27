@@ -1158,9 +1158,20 @@ function addNextMonth(){
 
 // ═══════════════════ SUMMARY ═══════════════════
 // ═══════════════════ CROSS-EMPLOYEE DAILY REPORT ═══════════════════
-let _reportDate = null;  // ISO yyyy-mm-dd
+let _reportFrom = null;  // ISO yyyy-mm-dd
+let _reportTo = null;    // ISO yyyy-mm-dd
 
 function isoToday(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function isoFromDate(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function daysBetween(from, to){
+  const a = new Date(from), b = new Date(to);
+  return Math.round((b - a) / 86400000) + 1;
+}
+function addDaysIso(iso, n){
+  const d = new Date(iso);
+  d.setDate(d.getDate()+n);
+  return isoFromDate(d);
+}
 
 function addHoursToTimeStr(timeStr, hours){
   if(!timeStr) return '';
@@ -1196,199 +1207,238 @@ function computeOtFromPeriodsMain(periods, isOffDay){
 }
 
 async function renderReportTab(){
-  if(!_reportDate) _reportDate = isoToday();
+  if(!_reportFrom) _reportFrom = isoToday();
+  if(!_reportTo) _reportTo = _reportFrom;
+  // Safety: from <= to and max 7 days
+  if(_reportTo < _reportFrom) _reportTo = _reportFrom;
+  const numDays = Math.min(31, Math.max(1, daysBetween(_reportFrom, _reportTo)));
+
   const el = document.getElementById('report-view');
   el.innerHTML = `<p style="text-align:center;color:#888;padding:20px;">⏳ กำลังโหลด...</p>`;
 
-  // Parse date → determine month key
-  const [yy,mm,dd] = _reportDate.split('-').map(Number);
-  const monthKey = `${yy}-${String(mm).padStart(2,'0')}`;
-  const day = dd;
-  const dObj = new Date(yy, mm-1, dd);
-
-  // Load month data + time entries
-  let monthInfo = data[monthKey];
-  if(!monthInfo){
-    // Fetch from cloud if not in local cache
-    try{
-      const rows = await sbFetch('GET',`schedule_months?key=eq.${encodeURIComponent(monthKey)}&select=key,data`);
-      monthInfo = rows[0]?.data;
-    }catch(e){ console.error(e); }
+  // Collect unique month_keys needed
+  const monthKeysNeeded = new Set();
+  for(let i=0; i<numDays; i++){
+    const iso = addDaysIso(_reportFrom, i);
+    const [y,mo] = iso.split('-');
+    monthKeysNeeded.add(`${y}-${mo}`);
   }
-  let entries = {};
-  try{
-    const rows = await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&select=*`);
-    rows.forEach(r => { entries[`${r.emp_name}|${r.day}`] = r; });
-  }catch(e){ console.error(e); }
 
-  const dowTH = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][dObj.getDay()];
-  const dateLabel = `${dowTH} ${dd} ${MONTH_TH[mm]} ${beYear(yy)}`;
+  // Load all needed months + time entries
+  const monthsData = {};
+  const entriesByMonth = {};
+  for(const mk of monthKeysNeeded){
+    try{
+      const rows = await sbFetch('GET',`schedule_months?key=eq.${encodeURIComponent(mk)}&select=key,data`);
+      monthsData[mk] = rows[0]?.data || null;
+      const ents = await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(mk)}&select=*`);
+      const map = {};
+      ents.forEach(r => { map[`${r.emp_name}|${r.day}`] = r; });
+      entriesByMonth[mk] = map;
+    }catch(e){
+      console.error(e);
+      monthsData[mk] = null;
+      entriesByMonth[mk] = {};
+    }
+  }
 
-  // Date controls + filter row
-  let html = `<div style="background:#fff;border-radius:10px;padding:12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);flex-wrap:wrap;">
-    <button class="btn-sec" onclick="shiftReportDate(-1)" style="padding:7px 12px;font-size:16px;font-weight:700;">◀</button>
-    <div style="flex:1;text-align:center;min-width:200px;">
-      <div style="font-size:14px;font-weight:700;color:#c44a1f;">${dateLabel}</div>
-      <input type="date" id="rep-date" value="${_reportDate}" onchange="onReportDateChange()" style="margin-top:5px;padding:5px 8px;font-size:12px;border:1px solid #f4b8a0;border-radius:5px;font-family:'Sarabun',sans-serif;background:#fef9e7;">
+  const fromD = new Date(_reportFrom);
+  const toD = new Date(_reportTo);
+  const fromLabel = `${String(fromD.getDate()).padStart(2,'0')}/${String(fromD.getMonth()+1).padStart(2,'0')}/${beYearShort(fromD.getFullYear())}`;
+  const toLabel = `${String(toD.getDate()).padStart(2,'0')}/${String(toD.getMonth()+1).padStart(2,'0')}/${beYearShort(toD.getFullYear())}`;
+
+  // ── Date controls ──
+  let html = `<div style="background:#fff;border-radius:10px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+      <label style="font-size:12px;color:#1565c0;font-weight:700;">จาก:</label>
+      <input type="date" value="${_reportFrom}" onchange="onReportFromChange(this.value)" style="padding:6px 8px;font-size:13px;border:1px solid #b3d4f5;border-radius:5px;font-family:'Sarabun',sans-serif;background:#f8fbff;">
+      <label style="font-size:12px;color:#1565c0;font-weight:700;">ถึง:</label>
+      <input type="date" value="${_reportTo}" onchange="onReportToChange(this.value)" style="padding:6px 8px;font-size:13px;border:1px solid #b3d4f5;border-radius:5px;font-family:'Sarabun',sans-serif;background:#f8fbff;">
+      <span style="font-size:11px;color:#888;">(${numDays} วัน)</span>
     </div>
-    <button class="btn-sec" onclick="shiftReportDate(1)" style="padding:7px 12px;font-size:16px;font-weight:700;">▶</button>
-    <button class="btn-pri" onclick="reportGoToday()" style="padding:7px 14px;">📅 วันนี้</button>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn-sec" onclick="reportPreset(1)" style="padding:6px 12px;font-size:11px;">📅 วันนี้</button>
+      <button class="btn-sec" onclick="reportPreset(2)" style="padding:6px 12px;font-size:11px;">2 วัน</button>
+      <button class="btn-sec" onclick="reportPreset(4)" style="padding:6px 12px;font-size:11px;">4 วัน</button>
+      <button class="btn-sec" onclick="reportPreset(7)" style="padding:6px 12px;font-size:11px;">สัปดาห์</button>
+      <button class="btn-sec" onclick="shiftReportRange(-1)" style="padding:6px 12px;font-size:11px;">◀ เลื่อนซ้าย</button>
+      <button class="btn-sec" onclick="shiftReportRange(1)" style="padding:6px 12px;font-size:11px;">เลื่อนขวา ▶</button>
+    </div>
   </div>`;
 
-  if(!monthInfo){
-    el.innerHTML = html + `<div style="background:#fff;padding:24px;text-align:center;border-radius:8px;color:#888;">
-      <p style="font-size:14px;color:#c44a1f;font-weight:700;">⚠️ ยังไม่มีตารางเดือนนี้</p>
-      <p style="font-size:12px;margin-top:6px;">ต้องสร้างตารางเดือน ${MONTH_TH[mm]} ${beYear(yy)} ก่อน</p>
-    </div>`;
-    return;
-  }
-
-  // Build rows: one per named employee
-  const emps = (monthInfo.employees||[]).filter(e=>e.name);
-  const rows = [];
-  let countWork=0, countOff=0, sumOtMin=0;
-
-  emps.forEach((emp, idx)=>{
-    const sched = (emp.schedule||{})[day]||'W';
-    const isOffDay = sched==='OFF' || sched==='REQ_OFF';
-    const isHalf = sched==='HALF';
-    const entry = entries[`${emp.name}|${day}`] || {};
-    const periods = entry.periods || [];
-    const hasEntry = !!(entry.work_start || periods.length>0);
-
-    // Schedule time (assigned)
-    const schedTime = entry.work_start ? `${entry.work_start}-${addHoursToTimeStr(entry.work_start, 8)}` : '';
-    // Actual in/out
-    let actIn = '', actOut = '';
-    if(periods.length){
-      actIn = periods[0].in || '';
-      if(periods.length === 1){
-        actOut = periods[0].out || '';
-      } else {
-        const parts = [periods[0].out || ''];
-        for(let i=1; i<periods.length; i++){
-          parts.push(`${periods[i].in||''}-${periods[i].out||''}`);
-        }
-        actOut = parts.join(', ');
-      }
-    } else if(entry.work_start){
-      actIn = entry.work_start;
-    }
-    // OT
-    const otMin = +entry.ot_min || 0;
-    // Note
-    let note = '';
-    if(isOffDay && hasEntry) note = '🌙 OT พิเศษ';
-    else if(sched==='OFF') note = 'OFF';
-    else if(sched==='REQ_OFF') note = 'ลา';
-    else if(isHalf) note = '½ ครึ่งวัน';
-    if(entry.note) note = (note?note+' · ':'') + entry.note;
-
-    if(isOffDay) countOff++;
-    if(hasEntry && !isOffDay) countWork++;
-    if(hasEntry) sumOtMin += otMin;
-
-    rows.push({no: idx+1, emp, sched, isOffDay, isHalf, hasEntry, schedTime, actIn, actOut, otMin, note});
-  });
-
-  const ddLabel = `${String(dd).padStart(2,'0')}/${String(mm).padStart(2,'0')}/${beYearShort(yy)}`;
-
+  // ── Build one card per day ──
   html += `<div id="report-card" style="background:#fff;border:1px solid #d0d7e0;border-radius:8px;padding:14px;margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;border-bottom:2px solid #1565c0;padding-bottom:10px;">
       <div>
-        <div style="font-size:16px;font-weight:800;color:#1565c0;">📋 รายงาน เข้า-ออก ประจำวัน</div>
+        <div style="font-size:17px;font-weight:800;color:#1565c0;">📋 รายงาน เข้า-ออก ประจำวัน</div>
         <div style="font-size:12px;color:#666;margin-top:4px;">Kornwat Garden Resort</div>
       </div>
       <div style="text-align:right;font-size:12px;color:#333;">
-        วันที่ <strong>${ddLabel}</strong><br>
-        <span style="font-size:11px;color:#666;">${dowTH}</span>
+        ${numDays===1
+          ? `วันที่ <strong>${fromLabel}</strong>`
+          : `จาก <strong>${fromLabel}</strong><br>ถึง <strong>${toLabel}</strong>`}
       </div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+    </div>`;
+
+  for(let i=0; i<numDays; i++){
+    const iso = addDaysIso(_reportFrom, i);
+    const [yy,mm,dd] = iso.split('-').map(Number);
+    const mk = `${yy}-${String(mm).padStart(2,'0')}`;
+    const monthInfo = monthsData[mk];
+    const entries = entriesByMonth[mk] || {};
+    const day = dd;
+    const dObj = new Date(yy, mm-1, dd);
+    const dowTH = ['อา','จ','อ','พ','พฤ','ศ','ส'][dObj.getDay()];
+    const dowFull = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][dObj.getDay()];
+    const ddLabel = `${String(dd).padStart(2,'0')}/${String(mm).padStart(2,'0')}/${beYearShort(yy)}`;
+
+    if(!monthInfo){
+      html += `<div style="margin-bottom:14px;padding:10px;background:#fef5f5;border-radius:6px;font-size:12px;color:#888;text-align:center;">
+        ⚠️ ${dowFull} ${dd} ${MONTH_TH[mm]} ${beYear(yy)} — ยังไม่มีตารางเดือนนี้
+      </div>`;
+      continue;
+    }
+
+    // Day section header (if multi-day)
+    if(numDays > 1){
+      html += `<div style="margin-top:${i===0?'0':'14px'};margin-bottom:6px;padding:6px 10px;background:#e3f2fd;border-left:3px solid #1565c0;border-radius:4px;font-size:13px;font-weight:700;color:#0d47a1;">
+        ${dowFull} ${dd} ${MONTH_TH[mm]} ${beYear(yy)}
+      </div>`;
+    }
+
+    // Build emp rows
+    const emps = (monthInfo.employees||[]).filter(e=>e.name);
+    let countWork=0, countOff=0, sumOtMin=0;
+    let tableRows = '';
+    emps.forEach((emp, idx)=>{
+      const sched = (emp.schedule||{})[day]||'W';
+      const isOffDay = sched==='OFF' || sched==='REQ_OFF';
+      const isHalf = sched==='HALF';
+      const entry = entries[`${emp.name}|${day}`] || {};
+      const periods = entry.periods || [];
+      const hasEntry = !!(entry.work_start || periods.length>0);
+
+      const schedTime = entry.work_start ? `${entry.work_start}-${addHoursToTimeStr(entry.work_start, 8)}` : '';
+      let actIn='', actOut='';
+      if(periods.length){
+        actIn = periods[0].in || '';
+        if(periods.length === 1){
+          actOut = periods[0].out || '';
+        } else {
+          const parts = [periods[0].out || ''];
+          for(let j=1; j<periods.length; j++){
+            parts.push(`${periods[j].in||''}-${periods[j].out||''}`);
+          }
+          actOut = parts.join(', ');
+        }
+      } else if(entry.work_start){
+        actIn = entry.work_start;
+      }
+      const otMin = +entry.ot_min || 0;
+      let note = '';
+      if(isOffDay && hasEntry) note = '🌙 OT พิเศษ';
+      else if(sched==='OFF') note = 'OFF';
+      else if(sched==='REQ_OFF') note = 'ลา';
+      else if(isHalf) note = '½ ครึ่งวัน';
+      if(entry.note) note = (note?note+' · ':'') + entry.note;
+
+      if(isOffDay) countOff++;
+      if(hasEntry && !isOffDay) countWork++;
+      if(hasEntry) sumOtMin += otMin;
+
+      let rowStyle = '';
+      if(isOffDay && hasEntry) rowStyle = 'background:#faf5ff;';
+      else if(isOffDay) rowStyle = 'background:#fef5f5;color:#888;';
+      else if(hasEntry) rowStyle = 'background:#f0fdf4;';
+
+      let schedCell = '';
+      if(isOffDay){
+        schedCell = sched==='REQ_OFF'
+          ? '<span style="color:#7c2d12;font-weight:700;">ลา</span>'
+          : '<span style="color:#c0392b;font-weight:700;">OFF</span>';
+      } else {
+        schedCell = schedTime || '—';
+      }
+      let noteCell = note;
+      if(noteCell.includes('OT พิเศษ')) noteCell = noteCell.replace('🌙 OT พิเศษ','<span style="color:#a855f7;font-weight:700;">🌙 OT พิเศษ</span>');
+      else if(noteCell.startsWith('OFF')) noteCell = noteCell.replace('OFF','<span style="color:#c0392b;font-weight:700;">OFF</span>');
+      else if(noteCell.startsWith('ลา')) noteCell = noteCell.replace('ลา','<span style="color:#7c2d12;font-weight:700;">ลา</span>');
+      else if(noteCell.startsWith('½')) noteCell = noteCell.replace('½ ครึ่งวัน','<span style="color:#d97706;font-weight:700;">½ ครึ่งวัน</span>');
+
+      tableRows += `<tr style="${rowStyle}">
+        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:700;color:#666;">${idx+1}</td>
+        <td style="padding:5px 6px;border:1px solid #e0e0e0;font-weight:700;color:#c44a1f;">${esc(emp.name)}</td>
+        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;">${schedCell}</td>
+        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:600;">${esc(actIn)||'—'}</td>
+        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-size:10px;white-space:nowrap;">${esc(actOut)||'—'}</td>
+        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:700;">${otMin?(otMin/60).toFixed(2)+' ชม.':'—'}</td>
+        <td style="padding:5px 6px;border:1px solid #e0e0e0;font-size:10px;">${noteCell}</td>
+      </tr>`;
+    });
+
+    html += `<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+      <colgroup>
+        <col style="width:30px;">
+        <col style="width:90px;">
+        <col style="width:95px;">
+        <col style="width:60px;">
+        <col style="width:130px;">
+        <col style="width:65px;">
+        <col>
+      </colgroup>
       <thead>
         <tr style="background:#fef9c4;color:#5d4037;">
-          <th style="width:30px;padding:6px 3px;border:1px solid #c4a484;">No.</th>
+          <th style="padding:6px 3px;border:1px solid #c4a484;">No.</th>
           <th style="padding:6px;border:1px solid #c4a484;text-align:left;">ชื่อ</th>
-          <th style="width:70px;padding:6px 3px;border:1px solid #c4a484;white-space:nowrap;">วันที่</th>
-          <th style="width:90px;padding:6px 3px;border:1px solid #c4a484;">ตารางเวลา</th>
-          <th style="width:60px;padding:6px 3px;border:1px solid #c4a484;">เข้า</th>
-          <th style="width:130px;padding:6px 3px;border:1px solid #c4a484;">ออก</th>
-          <th style="width:55px;padding:6px 3px;border:1px solid #c4a484;">OT</th>
+          <th style="padding:6px 3px;border:1px solid #c4a484;">ตารางเวลา</th>
+          <th style="padding:6px 3px;border:1px solid #c4a484;">เข้า</th>
+          <th style="padding:6px 3px;border:1px solid #c4a484;">ออก</th>
+          <th style="padding:6px 3px;border:1px solid #c4a484;">OT</th>
           <th style="padding:6px;border:1px solid #c4a484;">หมายเหตุ</th>
         </tr>
       </thead>
-      <tbody>`;
-
-  rows.forEach(r=>{
-    const e = r.emp;
-    let rowStyle = '';
-    if(r.isOffDay && r.hasEntry) rowStyle = 'background:#faf5ff;';
-    else if(r.isOffDay) rowStyle = 'background:#fef5f5;color:#888;';
-    else if(r.hasEntry) rowStyle = 'background:#f0fdf4;';
-    // Schedule time cell
-    let schedCell = '';
-    if(r.isOffDay){
-      schedCell = r.sched==='REQ_OFF'
-        ? '<span style="color:#7c2d12;font-weight:700;">ลา</span>'
-        : '<span style="color:#c0392b;font-weight:700;">OFF</span>';
-    } else {
-      schedCell = r.schedTime || '—';
-    }
-    // Note cell with color
-    let noteCell = r.note;
-    if(noteCell.includes('OT พิเศษ')) noteCell = noteCell.replace('🌙 OT พิเศษ','<span style="color:#a855f7;font-weight:700;">🌙 OT พิเศษ</span>');
-    else if(noteCell.startsWith('OFF')) noteCell = noteCell.replace('OFF','<span style="color:#c0392b;font-weight:700;">OFF</span>');
-    else if(noteCell.startsWith('ลา')) noteCell = noteCell.replace('ลา','<span style="color:#7c2d12;font-weight:700;">ลา</span>');
-    else if(noteCell.startsWith('½')) noteCell = noteCell.replace('½ ครึ่งวัน','<span style="color:#d97706;font-weight:700;">½ ครึ่งวัน</span>');
-
-    html += `<tr style="${rowStyle}">
-      <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:700;color:#666;">${r.no}</td>
-      <td style="padding:5px 6px;border:1px solid #e0e0e0;">
-        <div style="font-weight:700;color:#c44a1f;">${esc(e.name)}</div>
-        ${e.position?`<div style="font-size:9px;color:#888;">${esc(e.position)}</div>`:''}
-      </td>
-      <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;white-space:nowrap;font-size:10px;">${ddLabel}</td>
-      <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;">${schedCell}</td>
-      <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:600;">${esc(r.actIn)||'—'}</td>
-      <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-size:10px;white-space:nowrap;">${esc(r.actOut)||'—'}</td>
-      <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:700;">${r.otMin?(r.otMin/60).toFixed(2)+' ชม.':'—'}</td>
-      <td style="padding:5px 6px;border:1px solid #e0e0e0;font-size:10px;">${noteCell}</td>
-    </tr>`;
-  });
-
-  html += `</tbody>
+      <tbody>${tableRows}</tbody>
       <tfoot>
         <tr style="background:#fef3e2;font-weight:800;color:#8b4513;">
-          <td colspan="6" style="padding:7px 6px;border:1px solid #c4a484;text-align:right;">รวมทั้งหมด ${rows.length} คน · ทำงาน ${countWork} · หยุด ${countOff}</td>
-          <td style="padding:7px 3px;border:1px solid #c4a484;text-align:center;color:#d97706;">${(sumOtMin/60).toFixed(2)} ชม.</td>
-          <td style="padding:7px 6px;border:1px solid #c4a484;"></td>
+          <td colspan="5" style="padding:6px;border:1px solid #c4a484;text-align:right;font-size:11px;">รวม ${emps.length} คน · ทำงาน ${countWork} · หยุด ${countOff}</td>
+          <td style="padding:6px 3px;border:1px solid #c4a484;text-align:center;color:#d97706;">${(sumOtMin/60).toFixed(2)} ชม.</td>
+          <td style="border:1px solid #c4a484;"></td>
         </tr>
       </tfoot>
-    </table>
-    <p style="text-align:center;font-size:10px;color:#aaa;margin-top:10px;">⏱ ${new Date().toLocaleTimeString('th-TH')}</p>
+    </table>`;
+  }
+
+  html += `<p style="text-align:center;font-size:10px;color:#aaa;margin-top:10px;">⏱ ${new Date().toLocaleTimeString('th-TH')}</p>
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
     <button class="btn-sec" onclick="renderReportTab()" style="flex:0 0 auto;padding:8px 14px;">🔄 โหลดใหม่</button>
-    <button class="btn-pri" onclick="exportNodeAsImage('report-card','รายงาน-${ddLabel}.png')" style="flex:1;min-width:120px;">📷 บันทึกรูป</button>
-    <button class="btn-pri" onclick="exportNodeAsPdf('report-card','รายงาน-${ddLabel}.pdf')" style="flex:1;min-width:120px;">📄 บันทึก PDF</button>
+    <button class="btn-pri" onclick="exportNodeAsImage('report-card','รายงาน-${fromLabel}${numDays>1?'_'+toLabel:''}.png')" style="flex:1;min-width:120px;">📷 บันทึกรูป</button>
+    <button class="btn-pri" onclick="exportNodeAsPdf('report-card','รายงาน-${fromLabel}${numDays>1?'_'+toLabel:''}.pdf')" style="flex:1;min-width:120px;">📄 บันทึก PDF</button>
   </div>`;
 
   el.innerHTML = html;
 }
 
-function shiftReportDate(delta){
-  const d = new Date(_reportDate);
-  d.setDate(d.getDate()+delta);
-  _reportDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function onReportFromChange(v){
+  _reportFrom = v;
+  if(_reportTo < v) _reportTo = v;
   renderReportTab();
 }
-function onReportDateChange(){
-  _reportDate = document.getElementById('rep-date').value;
+function onReportToChange(v){
+  _reportTo = v;
+  if(v < _reportFrom) _reportFrom = v;
   renderReportTab();
 }
-function reportGoToday(){
-  _reportDate = isoToday();
+function reportPreset(days){
+  _reportFrom = isoToday();
+  _reportTo = addDaysIso(_reportFrom, days-1);
+  renderReportTab();
+}
+function shiftReportRange(direction){
+  const numDays = daysBetween(_reportFrom, _reportTo);
+  _reportFrom = addDaysIso(_reportFrom, direction * numDays);
+  _reportTo = addDaysIso(_reportFrom, numDays-1);
   renderReportTab();
 }
 
