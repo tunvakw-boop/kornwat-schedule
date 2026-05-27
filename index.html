@@ -1672,45 +1672,215 @@ async function exportNodeAsPdf(nodeId, fname){
   showToast('📄 บันทึก PDF แล้ว');
 }
 
-function renderSummary(){
+async function renderSummary(){
   const m=data[curKey]; if(!m) return;
-  let html=`<div class="sum-card">
-    <div class="sum-card-hd">📊 สรุปประจำเดือน ${m.label}</div>
-    <table class="sum-tbl"><thead><tr>
-      <th style="text-align:left;">ชื่อพนักงาน</th>
-      <th>ทำงาน</th><th>OFF</th><th>ครึ่ง</th>
-      <th>ใช้</th><th>ที่มี</th><th>คงเหลือ</th>
-    </tr></thead><tbody>`;
-  m.employees.forEach(emp=>{
-    if(!emp.name) return;
-    const st = deriveEmpStats(emp, m);
-    const v = st.auto ? fmtNum(st.vacUsed) : (st.vacUsed||'-');
-    const pt = st.auto ? fmtNum(st.phTotal) : (st.phTotal||'-');
-    const pr = st.auto ? fmtNum(st.phRemain) : (st.phRemain||'-');
-    html+=`<tr>
-      <td><span style="color:#e07b54;font-weight:700;">${esc(emp.name)}</span>${emp.position?`<br><span style="font-size:9px;color:#888;">${esc(emp.position)}</span>`:''}<br>
-        <span class="badge ${BADGE_CLS[emp.type]||'b-reg'}">${TYPE_LBL[emp.type]||''}</span></td>
-      <td style="color:#2e7d32;font-weight:700;">${fmtNum(st.wk)}</td>
-      <td style="color:#c0392b;font-weight:700;">${fmtNum(st.actualOff)}</td>
-      <td style="color:#d97706;">${st.half||'-'}</td>
-      <td style="color:#1565c0;">${v||'-'}</td>
-      <td style="color:#6a1b9a;">${pt||'-'}</td>
-      <td style="color:#6a1b9a;font-weight:700;">${pr||'-'}</td>
-    </tr>`;
+  const el = document.getElementById('summary-view');
+  el.innerHTML = `<p style="text-align:center;color:#888;padding:20px;">⏳ กำลังโหลด...</p>`;
+
+  // Load time entries fresh
+  invalidateTimeEntriesCache(curKey);
+  const entries = await loadTimeEntries(curKey);
+
+  // Per-employee stats
+  const emps = m.employees.filter(e=>e.name);
+  const stats = emps.map(emp=>{
+    let workMin=0, otMin=0, daysWorked=0, daysOff=0, daysOtSpecial=0, daysHalf=0;
+    let earliestStart='', latestStart='', sumStartMin=0, startCount=0;
+    for(let d=1; d<=m.days; d++){
+      const sched = (emp.schedule||{})[d]||'W';
+      const isOffDay = sched==='OFF' || sched==='REQ_OFF';
+      const isHalf = sched==='HALF';
+      const entry = entries[`${emp.name}|${d}`];
+      const periods = entry?.periods||[];
+      const has = !!(entry && (entry.work_start || periods.length));
+      if(isOffDay) daysOff++;
+      if(isHalf) daysHalf++;
+      if(has && !isOffDay){
+        daysWorked++;
+        const s = computeOtFromPeriodsMain(periods, false);
+        workMin += s.totalMin;
+        // Track arrival pattern
+        if(entry.work_start){
+          const [h,mm] = entry.work_start.split(':').map(Number);
+          const startMin = h*60+mm;
+          sumStartMin += startMin;
+          startCount++;
+          if(!earliestStart || startMin < (parseInt(earliestStart.split(':')[0])*60+parseInt(earliestStart.split(':')[1]))) earliestStart = entry.work_start;
+          if(!latestStart || startMin > (parseInt(latestStart.split(':')[0])*60+parseInt(latestStart.split(':')[1]))) latestStart = entry.work_start;
+        }
+      }
+      if(has && isOffDay) daysOtSpecial++;
+      if(entry) otMin += (+entry.ot_min||0);
+    }
+    const salary = parseFloat(emp.salary)||0;
+    const su = emp.salaryUnit || (emp.type==='regular'?'month':'day');
+    const basePay = (su==='month') ? salary : salary * daysWorked;
+    const otPay = (otMin/60) * OT_RATE_PER_HOUR;
+    const total = basePay + otPay;
+    const avgStart = startCount ? Math.round(sumStartMin/startCount) : null;
+    const avgStartStr = avgStart!==null ? `${String(Math.floor(avgStart/60)).padStart(2,'0')}:${String(avgStart%60).padStart(2,'0')}` : '—';
+    return {emp, daysWorked, daysOff, daysOtSpecial, daysHalf, workMin, otMin, basePay, otPay, total, avgStart, avgStartStr, earliestStart, latestStart};
   });
-  html+=`</tbody></table></div>`;
-  const total=m.employees.filter(e=>e.name).length;
-  const regs=m.employees.filter(e=>e.name&&e.type==='regular').length;
-  const others=total-regs;
-  html+=`<div class="sum-card"><div class="sum-card-hd">📈 ภาพรวม ${m.label}</div>
-    <div style="padding:12px;display:flex;gap:10px;flex-wrap:wrap;text-align:center;">
-      <div style="flex:1;min-width:70px;"><div style="font-size:26px;font-weight:700;color:#e07b54;">${total}</div><div style="font-size:10px;color:#888;">พนักงานทั้งหมด</div></div>
-      <div style="flex:1;min-width:70px;"><div style="font-size:26px;font-weight:700;color:#2e7d32;">${regs}</div><div style="font-size:10px;color:#888;">พนักงานประจำ</div></div>
-      <div style="flex:1;min-width:70px;"><div style="font-size:26px;font-weight:700;color:#1565c0;">${others}</div><div style="font-size:10px;color:#888;">พาสไทม์/ฝึกงาน</div></div>
-    </div>
-    <div style="padding:0 12px 12px;font-size:11px;color:#8b4513;">${esc(m.note||'')}</div>
+
+  // Aggregate totals
+  const totalWorkMin = stats.reduce((s,r)=>s+r.workMin,0);
+  const totalOtMin = stats.reduce((s,r)=>s+r.otMin,0);
+  const totalBasePay = stats.reduce((s,r)=>s+r.basePay,0);
+  const totalOtPay = stats.reduce((s,r)=>s+r.otPay,0);
+  const totalPay = totalBasePay + totalOtPay;
+
+  // Find highlights
+  const sortedWork = [...stats].sort((a,b)=>b.workMin-a.workMin);
+  const sortedOt = [...stats].sort((a,b)=>b.otMin-a.otMin);
+  const sortedDays = [...stats].sort((a,b)=>b.daysWorked-a.daysWorked);
+  const sortedEarly = [...stats].filter(s=>s.avgStart!==null).sort((a,b)=>a.avgStart-b.avgStart);
+  const topWork = sortedWork[0];
+  const topOt = sortedOt.find(s=>s.otMin>0);
+  const topDays = sortedDays[0];
+  const earliestArriver = sortedEarly[0];
+
+  // Groups summary
+  const groups = m.groups||{};
+  const grpEntries = {}; // {name: [days]}
+  Object.entries(groups).forEach(([day,g])=>{
+    const gName = (typeof g === 'string') ? g : (g?.name||'');
+    if(!gName) return;
+    if(!grpEntries[gName]) grpEntries[gName]=[];
+    grpEntries[gName].push(parseInt(day));
+  });
+  const grpList = Object.entries(grpEntries).map(([n,days])=>{
+    days.sort((a,b)=>a-b);
+    return `<span style="display:inline-block;background:#fff3e0;color:#5d4037;padding:3px 8px;border-radius:12px;margin:2px;font-size:11px;font-weight:600;">${esc(n)} <span style="color:#888;font-size:10px;">(${days.length===1?days[0]:days.join(',')})</span></span>`;
+  }).join('');
+
+  // ── BUILD HTML ──
+  let html = '';
+
+  // Title + month + note
+  html += `<div style="margin-bottom:10px;">
+    <h2 style="font-size:18px;font-weight:800;color:#c44a1f;">📊 สรุปประจำเดือน ${m.label}</h2>
+    ${m.note?`<p style="font-size:12px;color:#8b4513;margin-top:4px;">${esc(m.note)}</p>`:''}
   </div>`;
-  document.getElementById('summary-view').innerHTML = html;
+
+  // Dashboard cards
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+    <div style="background:linear-gradient(135deg,#fde8d8 0%,#fce4ec 100%);padding:14px;border-radius:10px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#c44a1f;line-height:1;">${emps.length}</div>
+      <div style="font-size:11px;color:#8b4513;margin-top:4px;">👥 ทีมงาน (คน)</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#d5edd8 0%,#e8f5e9 100%);padding:14px;border-radius:10px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#2e7d32;line-height:1;">${(totalWorkMin/60).toFixed(0)}</div>
+      <div style="font-size:11px;color:#2e7d32;margin-top:4px;">💼 ชั่วโมงทำงานรวม</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#fef3c0 0%,#fcd34d 100%);padding:14px;border-radius:10px;text-align:center;">
+      <div style="font-size:28px;font-weight:800;color:#7c2d12;line-height:1;">${(totalOtMin/60).toFixed(1)}</div>
+      <div style="font-size:11px;color:#7c2d12;margin-top:4px;">🌙 OT รวม (ชม.)</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#fef0e0 0%,#ffd6e0 100%);padding:14px;border-radius:10px;text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:#c44a1f;line-height:1.1;">฿${fmt$(totalPay)}</div>
+      <div style="font-size:11px;color:#8b4513;margin-top:4px;">💰 ค่าจ้างรวม</div>
+    </div>
+  </div>`;
+
+  // Highlights
+  html += `<div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #fde8d8;">
+    <h3 style="font-size:14px;font-weight:800;color:#c44a1f;margin-bottom:10px;">🏆 ของเด็ดประจำเดือน</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;">`;
+  if(topWork && topWork.workMin>0){
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#e8f5e9;border-radius:8px;">
+      <span style="font-size:22px;">🥇</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:#2e7d32;font-weight:600;">ชั่วโมงทำงานเยอะที่สุด</div>
+        <div style="font-size:14px;color:#1b5e20;font-weight:700;">${esc(topWork.emp.name)} <span style="font-weight:400;color:#666;font-size:12px;">— ${(topWork.workMin/60).toFixed(1)} ชม. (${topWork.daysWorked} วัน)</span></div>
+      </div>
+    </div>`;
+  }
+  if(topOt){
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff3c4;border-radius:8px;">
+      <span style="font-size:22px;">🌙</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:#7c2d12;font-weight:600;">OT เยอะที่สุด</div>
+        <div style="font-size:14px;color:#7c2d12;font-weight:700;">${esc(topOt.emp.name)} <span style="font-weight:400;color:#666;font-size:12px;">— ${(topOt.otMin/60).toFixed(1)} ชม. (${fmt$(topOt.otPay)} บาท)</span></div>
+      </div>
+    </div>`;
+  }
+  if(topDays && topDays!==topWork && topDays.daysWorked>0){
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#e3f2fd;border-radius:8px;">
+      <span style="font-size:22px;">📅</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:#1565c0;font-weight:600;">วันทำงานเยอะที่สุด</div>
+        <div style="font-size:14px;color:#0d47a1;font-weight:700;">${esc(topDays.emp.name)} <span style="font-weight:400;color:#666;font-size:12px;">— ${topDays.daysWorked} วัน</span></div>
+      </div>
+    </div>`;
+  }
+  if(earliestArriver){
+    html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fef0e0;border-radius:8px;">
+      <span style="font-size:22px;">⏰</span>
+      <div style="flex:1;">
+        <div style="font-size:11px;color:#c44a1f;font-weight:600;">มาทำงานเช้าที่สุด (เฉลี่ย)</div>
+        <div style="font-size:14px;color:#c44a1f;font-weight:700;">${esc(earliestArriver.emp.name)} <span style="font-weight:400;color:#666;font-size:12px;">— เฉลี่ย ${earliestArriver.avgStartStr} น.</span></div>
+      </div>
+    </div>`;
+  }
+  if(grpList){
+    html += `<div style="padding:10px 12px;background:#fef9e7;border-radius:8px;">
+      <div style="font-size:11px;color:#8b4513;font-weight:600;margin-bottom:6px;">👥 กรุ๊ป/ทัวร์ที่มาเดือนนี้</div>
+      <div>${grpList}</div>
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // Bar chart: work + OT per employee
+  const maxBar = Math.max(...stats.map(s=>s.workMin + s.otMin), 60);
+  const sortedBar = [...stats].sort((a,b)=>(b.workMin+b.otMin)-(a.workMin+a.otMin));
+  html += `<div style="background:#fff;border-radius:10px;padding:14px;margin-bottom:12px;border:1px solid #fde8d8;">
+    <h3 style="font-size:14px;font-weight:800;color:#c44a1f;margin-bottom:12px;">📊 ชั่วโมงทำงาน + OT ต่อคน</h3>
+    <div style="display:flex;flex-direction:column;gap:8px;">`;
+  sortedBar.forEach(s=>{
+    const workPct = (s.workMin / maxBar) * 100;
+    const otPct = (s.otMin / maxBar) * 100;
+    const workH = (s.workMin/60).toFixed(1);
+    const otH = (s.otMin/60).toFixed(1);
+    html += `<div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:80px;font-size:11px;color:#5d4037;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(s.emp.name)}</div>
+      <div style="flex:1;display:flex;background:#f5f5f5;border-radius:4px;overflow:hidden;height:22px;">
+        ${workPct>0?`<div style="width:${workPct}%;background:linear-gradient(90deg,#2e7d32,#4caf50);color:#fff;font-size:10px;font-weight:700;padding:0 6px;display:flex;align-items:center;white-space:nowrap;">${workH}</div>`:''}
+        ${otPct>0?`<div style="width:${otPct}%;background:linear-gradient(90deg,#d97706,#f59e0b);color:#fff;font-size:10px;font-weight:700;padding:0 6px;display:flex;align-items:center;white-space:nowrap;">+${otH}</div>`:''}
+      </div>
+    </div>`;
+  });
+  html += `</div>
+    <div style="display:flex;gap:14px;margin-top:14px;font-size:11px;color:#666;justify-content:center;">
+      <span><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px;vertical-align:middle;"></span> ชั่วโมงทำงาน</span>
+      <span><span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border-radius:2px;vertical-align:middle;"></span> OT</span>
+    </div>
+  </div>`;
+
+  // Employee types breakdown
+  const regs = emps.filter(e=>e.type==='regular').length;
+  const pts = emps.filter(e=>e.type==='parttime').length;
+  const ins = emps.filter(e=>e.type==='intern').length;
+  if(regs+pts+ins > 0){
+    html += `<div style="background:#fff;border-radius:10px;padding:12px;border:1px solid #fde8d8;">
+      <h3 style="font-size:13px;font-weight:700;color:#c44a1f;margin-bottom:8px;">ประเภทพนักงาน</h3>
+      <div style="display:flex;gap:8px;text-align:center;">
+        <div style="flex:1;padding:8px;background:#e8f5e9;border-radius:6px;">
+          <div style="font-size:20px;font-weight:800;color:#2e7d32;">${regs}</div>
+          <div style="font-size:10px;color:#2e7d32;">ประจำ</div>
+        </div>
+        <div style="flex:1;padding:8px;background:#e3f2fd;border-radius:6px;">
+          <div style="font-size:20px;font-weight:800;color:#1565c0;">${pts}</div>
+          <div style="font-size:10px;color:#1565c0;">พาสไทม์</div>
+        </div>
+        <div style="flex:1;padding:8px;background:#fff3e0;border-radius:6px;">
+          <div style="font-size:20px;font-weight:800;color:#e65100;">${ins}</div>
+          <div style="font-size:10px;color:#e65100;">ฝึกงาน</div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 // ═══════════════════ MANAGE ═══════════════════
