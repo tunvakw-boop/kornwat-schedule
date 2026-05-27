@@ -590,6 +590,34 @@ function readTimePicker(idPrefix){
   return `${h}:${m}`;
 }
 
+// Add N hours to a HH:MM string, wrapping at 24h
+function addHoursToTime(timeStr, hours){
+  if(!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const totalMin = h*60 + m + hours*60;
+  const wrapped = ((totalMin % (24*60)) + 24*60) % (24*60);
+  const nh = Math.floor(wrapped / 60);
+  const nm = wrapped % 60;
+  return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`;
+}
+
+// Set time-picker selects to a HH:MM value, snapping minutes to available options
+function setTimePickerValue(idPrefix, timeStr){
+  const [hh, mm] = timeStr.split(':');
+  const hSel = document.getElementById(`${idPrefix}-h`);
+  const mSel = document.getElementById(`${idPrefix}-m`);
+  if(!hSel || !mSel) return;
+  hSel.value = hh;
+  const opts = Array.from(mSel.options).map(o=>parseInt(o.value));
+  const mNum = parseInt(mm);
+  let best = opts[0], minDiff = Infinity;
+  opts.forEach(o=>{
+    const d = Math.abs(o - mNum);
+    if(d < minDiff){ minDiff = d; best = o; }
+  });
+  mSel.value = String(best).padStart(2,'0');
+}
+
 // ═══════════════ ASSIGN MODAL (กำหนดเวลาเข้า — for Line msg) ═══════════════
 function openAssignModal(empName, day){
   const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
@@ -638,8 +666,13 @@ let _periodsDraft = [];
 function openRecordModal(empName, day){
   const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
   const offDay = isDayOff(empName, day);
-  _periodsDraft = (cur.periods && cur.periods.length) ? JSON.parse(JSON.stringify(cur.periods))
-                : [{in: cur.work_start||(offDay?'18:00':'08:00'), out:''}];
+  if(cur.periods && cur.periods.length){
+    _periodsDraft = JSON.parse(JSON.stringify(cur.periods));
+  } else {
+    const defaultIn = cur.work_start || (offDay ? '18:00' : '08:00');
+    const defaultOut = addHoursToTime(defaultIn, 9);
+    _periodsDraft = [{in: defaultIn, out: defaultOut}];
+  }
   const title = offDay ? `OT พิเศษ (วันหยุด) — ${empName}` : `ลงเวลาทำงาน — ${empName}`;
   document.getElementById('modal-title').textContent = title;
   renderRecordModal(empName, day);
@@ -684,11 +717,24 @@ function renderRecordModal(empName, day){
     <button class="btn-sec" onclick="closeModal()">ยกเลิก</button>
     <button class="btn-pri" onclick="saveRecord('${esc(empName).replace(/'/g,"\\'")}',${day})">บันทึก</button>`;
   updatePeriodStats();
-  // Wire change listeners to update stats live
+  // Wire change listeners
   _periodsDraft.forEach((_,idx)=>{
-    ['in','out'].forEach(io=>{
-      document.getElementById(`p${idx}-${io}-h`).onchange = ()=>{ readPeriodsDraft(); updatePeriodStats(); };
-      document.getElementById(`p${idx}-${io}-m`).onchange = ()=>{ readPeriodsDraft(); updatePeriodStats(); };
+    // When IN changes → auto-set OUT to in+9h, then update stats
+    ['h','m'].forEach(comp=>{
+      document.getElementById(`p${idx}-in-${comp}`).onchange = ()=>{
+        const inVal = readTimePicker(`p${idx}-in`);
+        const outVal = addHoursToTime(inVal, 9);
+        setTimePickerValue(`p${idx}-out`, outVal);
+        readPeriodsDraft();
+        updatePeriodStats();
+      };
+    });
+    // When OUT changes → just update stats (user override)
+    ['h','m'].forEach(comp=>{
+      document.getElementById(`p${idx}-out-${comp}`).onchange = ()=>{
+        readPeriodsDraft();
+        updatePeriodStats();
+      };
     });
   });
 }
@@ -720,12 +766,13 @@ function updatePeriodStats(){
 }
 function addPeriod(){
   readPeriodsDraft();
-  // Default new period's in = previous out (or 18:00)
+  // Default new period's in = previous out (or 18:00). Out = in + 9h.
   const last = _periodsDraft[_periodsDraft.length-1];
   const newIn = (last && last.out) ? last.out : '18:00';
-  _periodsDraft.push({in:newIn, out:''});
-  // Need to re-render the modal body
-  const title = document.getElementById('modal-title').textContent.replace('ลงเวลาทำงาน — ','');
+  const newOut = addHoursToTime(newIn, 9);
+  _periodsDraft.push({in:newIn, out:newOut});
+  // Re-render the modal body
+  const title = document.getElementById('modal-title').textContent.replace('ลงเวลาทำงาน — ','').replace('OT พิเศษ (วันหยุด) — ','');
   renderRecordModal(title, curDate.getDate());
 }
 function removePeriod(idx){
