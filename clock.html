@@ -9,6 +9,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:'Sarabun',sans-serif;}
 body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;color:#3d2914;}
@@ -48,6 +50,39 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 .action-row button:active,.action-row button.active{background:#e07b54;color:#fff;}
 .action-row button.line-btn{background:#06c755;color:#fff;border-color:#06c755;}
 .action-row button.line-btn:active{background:#05a043;}
+.action-row button.rep-btn{background:#1565c0;color:#fff;border-color:#1565c0;}
+.action-row button.rep-btn:active{background:#0d47a1;}
+
+/* REPORT */
+#report-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:150;display:none;align-items:flex-start;justify-content:center;padding:10px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#report-modal.show{display:flex;}
+#report-box{background:#fff;border-radius:12px;width:100%;max-width:780px;display:flex;flex-direction:column;overflow:hidden;}
+#report-hd{background:#1565c0;color:#fff;padding:12px 16px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+#report-hd h2{flex:1;font-size:15px;}
+#report-cl{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;}
+#report-bd{padding:14px;overflow-y:auto;flex:1;}
+#report-ft{padding:10px 14px;display:flex;gap:8px;border-top:1px solid #e0e0e0;flex-wrap:wrap;}
+.rep-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;font-size:12px;}
+.rep-filter label{font-size:12px;color:#1565c0;font-weight:700;}
+.rep-filter input,.rep-filter select{padding:7px 9px;border:1px solid #b3d4f5;border-radius:6px;font-size:13px;font-family:'Sarabun',sans-serif;background:#f8fbff;}
+.rep-card{border:1px solid #d0d7e0;border-radius:8px;padding:14px;background:#fff;}
+.rep-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;border-bottom:2px solid #1565c0;padding-bottom:10px;}
+.rep-title{font-size:16px;font-weight:800;color:#1565c0;}
+.rep-meta{font-size:12px;color:#333;line-height:1.6;margin-top:4px;}
+.rep-meta strong{color:#1565c0;}
+.rep-tbl{width:100%;border-collapse:collapse;font-size:11px;}
+.rep-tbl th{background:#fef9c4;color:#5d4037;padding:6px 4px;border:1px solid #d0d0d0;text-align:center;font-weight:700;}
+.rep-tbl td{padding:5px 4px;border:1px solid #e0e0e0;text-align:center;}
+.rep-tbl tr.off-row td{background:#fef5f5;color:#888;}
+.rep-tbl tr.has-entry td{background:#f0fdf4;}
+.rep-tbl tr:hover{background:#fef9e7;cursor:pointer;}
+.rep-tbl tfoot td{background:#fef0e0;font-weight:700;color:#c44a1f;}
+.rep-tbl td.date-cell{text-align:left;padding-left:8px;font-weight:600;}
+.rep-tbl td.note-cell{text-align:left;font-size:10px;color:#666;}
+.rep-summary{display:flex;gap:14px;margin-top:14px;padding:10px;background:#e8f4fd;border-radius:6px;flex-wrap:wrap;}
+.rep-summary div{flex:1;text-align:center;min-width:100px;}
+.rep-summary div span{font-size:11px;color:#666;display:block;}
+.rep-summary div strong{font-size:16px;color:#1565c0;}
 
 #mode-banner{background:#fde8d8;color:#8b4513;padding:7px 12px;border-radius:6px;font-size:12px;text-align:center;margin-bottom:10px;font-weight:600;}
 #mode-banner.record-mode{background:#fff3c4;color:#7a5d20;}
@@ -148,11 +183,14 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
     <button class="nav-arr" onclick="shiftDate(1)">▶</button>
   </div>
 
-  <div class="action-row">
+  <div class="action-row" style="grid-template-columns:1fr 1fr 1fr;">
     <button onclick="goToday()">📅 วันนี้</button>
     <button id="btn-mode" onclick="toggleMode()">📋 ลงเวลาทำงาน</button>
     <button onclick="goTomorrow()">⏭ พรุ่งนี้</button>
+  </div>
+  <div class="action-row" style="grid-template-columns:1fr 1fr;margin-top:6px;">
     <button class="line-btn" onclick="showLineMessage()">💬 Line</button>
+    <button class="rep-btn" onclick="openReportModal()">📊 รายงาน</button>
   </div>
 
   <div id="mode-banner">🕘 โหมด: <strong>กำหนดเวลาเข้างาน</strong> (สำหรับข้อความ Line)</div>
@@ -165,6 +203,22 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
     <div id="modal-hd"><span id="modal-title"></span><button id="modal-cl" onclick="closeModal()">×</button></div>
     <div id="modal-bd"></div>
     <div id="modal-ft"></div>
+  </div>
+</div>
+
+<!-- REPORT MODAL (separate from main modal) -->
+<div id="report-modal">
+  <div id="report-box">
+    <div id="report-hd">
+      <h2>📊 รายงานสรุปเวลาเข้าออกประจำวัน</h2>
+      <button id="report-cl" onclick="closeReportModal()">×</button>
+    </div>
+    <div id="report-bd"></div>
+    <div id="report-ft">
+      <button class="btn-sec" onclick="closeReportModal()">ปิด</button>
+      <button class="btn-pri" style="background:#1565c0;flex:1;" onclick="exportReportPNG()">📷 บันทึกรูป</button>
+      <button class="btn-pri" style="background:#1565c0;flex:1;" onclick="exportReportPDF()">📄 บันทึก PDF</button>
+    </div>
   </div>
 </div>
 
@@ -737,6 +791,273 @@ function shareToLine(){
   const msg = document.getElementById('line-textarea').value;
   const url = 'https://line.me/R/share?text=' + encodeURIComponent(msg);
   window.open(url, '_blank');
+}
+
+// ═══════════════ REPORT ═══════════════
+let _reportState = {empName:'', from:null, to:null, monthsCache:{}};
+
+function isoDateLocal(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+async function openReportModal(){
+  if(!monthData){ alert('โหลดข้อมูลเดือนก่อน'); return; }
+  // Default: current month first → last
+  const y = curDate.getFullYear(), mo = curDate.getMonth();
+  const first = new Date(y, mo, 1);
+  const last = new Date(y, mo+1, 0);
+  _reportState.from = isoDateLocal(first);
+  _reportState.to = isoDateLocal(last);
+  // Default emp = first working employee
+  const emps = (monthData.employees||[]).filter(e=>e.name);
+  if(!emps.length){ alert('ยังไม่มีพนักงาน'); return; }
+  _reportState.empName = emps[0].name;
+  _reportState.monthsCache = {[dateKey(curDate)]: {data:monthData, entries:timeEntriesForMonth}};
+  document.getElementById('report-modal').classList.add('show');
+  await renderReport();
+}
+
+function closeReportModal(){
+  document.getElementById('report-modal').classList.remove('show');
+}
+
+async function ensureMonth(monthKey){
+  if(_reportState.monthsCache[monthKey]) return _reportState.monthsCache[monthKey];
+  try{
+    const rows = await sbFetch('GET',`schedule_months?key=eq.${encodeURIComponent(monthKey)}&select=key,data`);
+    const entries = await sbFetch('GET',`time_entries?month_key=eq.${encodeURIComponent(monthKey)}&select=*`);
+    const eMap = {};
+    entries.forEach(e=>{ eMap[`${e.emp_name}|${e.day}`] = e; });
+    _reportState.monthsCache[monthKey] = {data: rows[0]?.data||null, entries: eMap};
+    return _reportState.monthsCache[monthKey];
+  }catch(e){ console.error(e); return {data:null, entries:{}}; }
+}
+
+function addHours(timeStr, hours){
+  if(!timeStr) return '';
+  const [h,m] = timeStr.split(':').map(Number);
+  const total = h*60 + m + hours*60;
+  const nh = Math.floor(((total%(24*60))+24*60)%(24*60) / 60);
+  const nm = total % 60;
+  return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`;
+}
+
+async function renderReport(){
+  const emps = (monthData.employees||[]).filter(e=>e.name);
+  const fromD = new Date(_reportState.from);
+  const toD = new Date(_reportState.to);
+  const empSel = emps.map(e=>`<option value="${esc(e.name)}" ${e.name===_reportState.empName?'selected':''}>${esc(e.name)} ${e.position?`(${esc(e.position)})`:''}</option>`).join('');
+
+  let html = `<div class="rep-filter">
+      <label>พนักงาน:</label>
+      <select onchange="onReportFilterChange('emp', this.value)" style="flex:1;min-width:140px;">${empSel}</select>
+      <label>จาก:</label>
+      <input type="date" value="${_reportState.from}" onchange="onReportFilterChange('from', this.value)">
+      <label>ถึง:</label>
+      <input type="date" value="${_reportState.to}" onchange="onReportFilterChange('to', this.value)">
+    </div>`;
+
+  const emp = emps.find(e=>e.name===_reportState.empName) || emps[0];
+  if(!emp){ document.getElementById('report-bd').innerHTML = html + '<p>ไม่มีพนักงาน</p>'; return; }
+
+  // Collect months in range
+  const monthsNeeded = new Set();
+  for(let d=new Date(fromD); d<=toD; d.setDate(d.getDate()+1)){
+    monthsNeeded.add(dateKey(d));
+  }
+  // Pre-fetch
+  for(const mk of monthsNeeded){ await ensureMonth(mk); }
+
+  // Build rows
+  const rows = [];
+  let sumWorkMin = 0, sumOtMin = 0, daysCame = 0, daysOff = 0;
+  for(let d=new Date(fromD); d<=toD; d.setDate(d.getDate()+1)){
+    const mk = dateKey(d);
+    const day = d.getDate();
+    const monthInfo = _reportState.monthsCache[mk];
+    if(!monthInfo || !monthInfo.data){
+      rows.push({date:new Date(d), day, missing:true});
+      continue;
+    }
+    const empInMonth = (monthInfo.data.employees||[]).find(e=>e.name===emp.name);
+    const sched = empInMonth ? ((empInMonth.schedule||{})[day]||'W') : null;
+    const entry = monthInfo.entries[`${emp.name}|${day}`] || {};
+    const periods = entry.periods || [];
+    let firstIn = '', lastOut = '', workMin = 0;
+    if(periods.length){
+      firstIn = periods[0].in || '';
+      lastOut = periods[periods.length-1].out || '';
+      const stats = computeOtFromPeriods(periods);
+      workMin = stats.totalMin;
+    }
+    const otMin = +entry.ot_min || 0;
+    const startEnd = entry.work_start ? `${entry.work_start}-${addHours(entry.work_start, 8)}` : '';
+    // Status
+    let statusNote = '';
+    if(sched==='OFF') statusNote='OFF';
+    else if(sched==='REQ_OFF') statusNote='ลา';
+    else if(sched==='HALF') statusNote='½';
+    rows.push({date:new Date(d), day, mk, monthInfo, sched, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||''});
+    if(periods.length){ daysCame++; sumWorkMin += workMin; sumOtMin += otMin; }
+    if(sched==='OFF' || sched==='REQ_OFF') daysOff++;
+  }
+
+  const fromLabel = fromD.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const toLabel = toD.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  // Card with table — wrapped for export
+  let card = `<div class="rep-card" id="rep-card-export">
+    <div class="rep-header">
+      <div>
+        <div class="rep-title">รายงานสรุปเวลาเข้าออกประจำวัน</div>
+        <div class="rep-meta">
+          รหัสพนักงาน: <strong>${esc(emp.no||'—')}</strong>　·　แผนก: <strong>${esc(emp.position||'—')}</strong><br>
+          ชื่อ: <strong>${esc(emp.name)}</strong>　·　ประเภท: <strong>${({regular:'ประจำ',parttime:'พาสไทม์',intern:'ฝึกงาน'})[emp.type]||emp.type}</strong>
+        </div>
+      </div>
+      <div style="text-align:right;font-size:12px;color:#666;">
+        จากวันที่ <strong>${fromLabel}</strong><br>ถึง <strong>${toLabel}</strong>
+      </div>
+    </div>
+    <table class="rep-tbl">
+      <thead>
+        <tr>
+          <th style="width:80px;">วันที่</th>
+          <th style="width:90px;">ตารางเวลา</th>
+          <th style="width:60px;">เข้า</th>
+          <th style="width:60px;">ออก</th>
+          <th style="width:70px;">เวลารวม</th>
+          <th style="width:60px;">OT</th>
+          <th>หมายเหตุ</th>
+        </tr>
+      </thead>
+      <tbody>`;
+  rows.forEach((r, idx)=>{
+    if(r.missing){
+      card += `<tr class="off-row"><td colspan="7" style="color:#aaa;">— ไม่มีตารางเดือนนี้ —</td></tr>`;
+      return;
+    }
+    const dowTH = ['อา','จ','อ','พ','พฤ','ศ','ส'][r.date.getDay()];
+    const dateLabel = `${String(r.day).padStart(2,'0')}/${String(r.date.getMonth()+1).padStart(2,'0')}/${beYearShort(r.date.getFullYear())} (${dowTH})`;
+    const rowCls = (r.sched==='OFF'||r.sched==='REQ_OFF') ? 'off-row' : (r.periods.length ? 'has-entry' : '');
+    card += `<tr class="${rowCls}" onclick="editReportRow('${esc(emp.name).replace(/'/g,"\\'")}','${r.mk}',${r.day})">
+      <td class="date-cell">${dateLabel}</td>
+      <td>${esc(r.startEnd) || (r.statusNote==='OFF'?'<span style="color:#c0392b;">OFF</span>':r.statusNote==='ลา'?'<span style="color:#7c2d12;">ลา</span>':'—')}</td>
+      <td>${esc(r.firstIn)||'—'}</td>
+      <td>${esc(r.lastOut)||'—'}</td>
+      <td>${r.workMin?fmtHours(r.workMin)+' ชม.':'—'}</td>
+      <td>${r.otMin?fmtHours(r.otMin)+' ชม.':'—'}</td>
+      <td class="note-cell">${esc(r.note)||(r.statusNote==='OFF'?'หยุดประจำ':r.statusNote==='ลา'?'รีเควสต์':'')}</td>
+    </tr>`;
+  });
+  card += `</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="4" style="text-align:right;">รวม</td>
+          <td>${fmtHours(sumWorkMin)} ชม.</td>
+          <td>${fmtHours(sumOtMin)} ชม.</td>
+          <td style="text-align:left;">มา ${daysCame} วัน · หยุด ${daysOff} วัน</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="rep-summary">
+      <div><span>วันที่มา</span><strong>${daysCame}</strong></div>
+      <div><span>วันหยุด</span><strong>${daysOff}</strong></div>
+      <div><span>เวลารวม</span><strong>${fmtHours(sumWorkMin)} ชม.</strong></div>
+      <div><span>OT รวม</span><strong>${fmtHours(sumOtMin)} ชม.</strong></div>
+    </div>
+    <p style="font-size:10px;color:#888;margin-top:8px;text-align:center;">แตะแถวเพื่อแก้ไขเวลาทำงานของวันนั้น</p>
+  </div>`;
+  document.getElementById('report-bd').innerHTML = html + card;
+}
+
+async function onReportFilterChange(field, value){
+  if(field==='emp') _reportState.empName = value;
+  else if(field==='from') _reportState.from = value;
+  else if(field==='to') _reportState.to = value;
+  await renderReport();
+}
+
+async function editReportRow(empName, monthKey, day){
+  // Switch curDate to that month and open record modal
+  const [y, m] = monthKey.split('-').map(Number);
+  // Set curDate to that day temporarily
+  const savedDate = new Date(curDate);
+  curDate = new Date(y, m-1, day);
+  // Ensure timeEntriesForMonth reflects that month
+  const monthInfo = _reportState.monthsCache[monthKey] || await ensureMonth(monthKey);
+  timeEntriesForMonth = monthInfo.entries;
+  monthData = monthInfo.data;
+  // Temporarily set mode=record for proper time picker granularity
+  const savedMode = mode;
+  mode = 'record';
+  openRecordModal(empName, day);
+  // Patch save callback to refresh report after save
+  const origSave = saveRecord;
+  window.saveRecord = async function(en, dy){
+    await origSave(en, dy);
+    // Update cache and re-render report
+    if(_reportState.monthsCache[monthKey]){
+      _reportState.monthsCache[monthKey].entries = timeEntriesForMonth;
+    }
+    window.saveRecord = origSave;
+    mode = savedMode;
+    curDate = savedDate;
+    // Restore main view state
+    await loadDate(curDate);
+    await renderReport();
+  };
+  // Also restore on cancel
+  const origCloseModal = closeModal;
+  window.closeModal = function(){
+    origCloseModal();
+    window.saveRecord = origSave;
+    window.closeModal = origCloseModal;
+    mode = savedMode;
+    curDate = savedDate;
+    loadDate(curDate);
+  };
+}
+
+async function exportReportPNG(){
+  const node = document.getElementById('rep-card-export'); if(!node) return;
+  showToast('⏳ กำลังสร้างรูป...');
+  try{
+    const canvas = await html2canvas(node, {backgroundColor:'#fff', scale:2, useCORS:true, allowTaint:true, logging:false});
+    const fname = `รายงาน-${_reportState.empName}-${_reportState.from}_${_reportState.to}.png`;
+    canvas.toBlob(async (blob)=>{
+      if(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) && navigator.share && navigator.canShare){
+        const file = new File([blob], fname, {type:'image/png'});
+        if(navigator.canShare({files:[file]})){
+          try{ await navigator.share({files:[file], title:fname}); showToast('📷 พร้อมแชร์'); return; }catch(e){ if(e.name==='AbortError') return; }
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
+      showToast('📷 บันทึกรูปแล้ว');
+    },'image/png',0.95);
+  }catch(e){ console.error(e); showToast('⚠ '+(e.message||'').slice(0,80)); }
+}
+
+async function exportReportPDF(){
+  const node = document.getElementById('rep-card-export'); if(!node) return;
+  if(!window.jspdf){ showToast('⚠ jspdf ไม่พร้อม'); return; }
+  showToast('⏳ กำลังสร้าง PDF...');
+  try{
+    const canvas = await html2canvas(node, {backgroundColor:'#fff', scale:2, useCORS:true, allowTaint:true, logging:false});
+    const {jsPDF} = window.jspdf;
+    const w = canvas.width, h = canvas.height;
+    const orient = w>h ? 'landscape' : 'portrait';
+    const pdf = new jsPDF({orientation:orient, unit:'pt', format:'a4'});
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 24;
+    const scale = Math.min((pageW-margin*2)/w, (pageH-margin*2)/h);
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG', (pageW-w*scale)/2, (pageH-h*scale)/2, w*scale, h*scale);
+    pdf.save(`รายงาน-${_reportState.empName}-${_reportState.from}_${_reportState.to}.pdf`);
+    showToast('📄 บันทึก PDF แล้ว');
+  }catch(e){ console.error(e); showToast('⚠ '+(e.message||'').slice(0,80)); }
 }
 
 // ═══════════════ TOAST ═══════════════
