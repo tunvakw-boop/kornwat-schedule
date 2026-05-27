@@ -1168,15 +1168,20 @@ async function renderPayroll(){
   const rows = [];
   m.employees.forEach(emp=>{
     if(!emp.name) return;
-    let daysWorked=0, daysOff=0, totalOtMin=0;
+    let daysWorked=0, daysOff=0, totalOtMin=0, daysOtSpecial=0;
     for(let d=1; d<=m.days; d++){
       const e = entries[`${emp.name}|${d}`];
       const sched = (emp.schedule||{})[d]||'W';
-      if(hasWorkEntry(e)){
-        daysWorked++;
-        totalOtMin += +e.ot_min||0;
-      }
-      if(sched==='OFF' || sched==='REQ_OFF') daysOff++;
+      const isOffDay = sched==='OFF' || sched==='REQ_OFF';
+      const has = hasWorkEntry(e);
+      // Counting rules:
+      // - Regular work day with entry → daysWorked
+      // - OFF day with entry (came for OT) → daysOff still counts, daysOtSpecial++ (info)
+      // - OT minutes summed regardless of schedule (OT พิเศษ counts too)
+      if(has && !isOffDay) daysWorked++;
+      if(has && isOffDay) daysOtSpecial++;
+      if(has) totalOtMin += +e.ot_min||0;
+      if(isOffDay) daysOff++;
     }
     const salary = parseFloat(emp.salary)||0;
     const su = emp.salaryUnit || (emp.type==='regular'?'month':'day');
@@ -1184,7 +1189,7 @@ async function renderPayroll(){
     const otHours = totalOtMin / 60;
     const otPay = otHours * OT_RATE_PER_HOUR;
     const total = basePay + otPay;
-    rows.push({emp, daysWorked, daysOff, totalOtMin, otHours, basePay, otPay, total, su, salary});
+    rows.push({emp, daysWorked, daysOff, daysOtSpecial, totalOtMin, otHours, basePay, otPay, total, su, salary});
   });
 
   const sumDays  = rows.reduce((s,r)=>s+r.daysWorked, 0);
@@ -1234,7 +1239,7 @@ async function renderPayroll(){
         <div style="font-size:10px;color:#666;">${typeLbl}${e.position?` · ${esc(e.position)}`:''} ${unitLbl}</div>
       </td>
       <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#1565c0;font-weight:700;">${r.daysWorked}</td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}</td>
+      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}${r.daysOtSpecial?`<br><span style="font-size:9px;color:#a855f7;">(OT พิเศษ ${r.daysOtSpecial})</span>`:''}</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)}</td>
       <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:600;">${fmtNum(r.otHours)}</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#d97706;font-weight:700;">${fmt$(r.otPay)}</td>
@@ -1274,13 +1279,15 @@ async function renderPayroll(){
   // Notes
   html += `<div class="sum-card"><div class="sum-card-hd">ℹ️ กติกาคำนวณ</div>
     <div style="padding:12px;font-size:12px;line-height:1.7;color:#5d4037;">
-      • <strong>วันทำงาน</strong> = จำนวนวันที่มีการลงเวลา (work_start หรือ ช่วงเวลา จาก clock.html)<br>
-      • <strong>วันหยุด</strong> = OFF + วันหยุดรีเควสต์ ตามตารางในเดือน<br>
+      • <strong>วันทำงาน</strong> = วันที่ schedule = W/HALF <strong>และ</strong> มีลงเวลา (ไม่นับวันหยุด)<br>
+      • <strong>วันหยุด</strong> = OFF + รีเควสต์ตามตาราง (รวมวันที่มา OT พิเศษด้วย)<br>
+      • <strong>(OT พิเศษ N)</strong> = วันหยุดที่พนักงานมาทำงาน → คิดเป็น OT 100% (ไม่นับเป็นวันทำงาน)<br>
       • <strong>เงินเดือนประจำ</strong>: ฐานคงที่เต็มเดือน ไม่หักขาด<br>
       • <strong>รายวัน (พาสไทม์/ฝึกงาน)</strong>: ฐาน = ค่าจ้าง × วันทำงาน<br>
-      • <strong>ค่า OT</strong> = (OT นาที ÷ 60) × <strong>${OT_RATE_PER_HOUR} บาท/ชม.</strong> (คงที่ทุกคน)<br>
-      • <strong>รวม</strong> = เงินเดือน + ค่า OT (ไม่มีหักลด)<br>
-      • ตัวเลขซิงค์อัตโนมัติกับรายงานใน clock.html
+      • <strong>ค่า OT</strong> = (OT นาทีรวม ÷ 60) × <strong>${OT_RATE_PER_HOUR} บาท/ชม.</strong><br>
+      • วัน OFF + OT: ทุกนาทีคิดเป็น OT (ไม่หักพักเที่ยง ไม่ลบ 8 ชม.)<br>
+      • วัน W/HALF + OT: หักพักเที่ยง 1 ชม. ถ้า session ≥ 6 ชม. แล้วค่อยลบ 8 ชม.<br>
+      • <strong>รวม</strong> = เงินเดือน + ค่า OT (ไม่มีหักลด) · ซิงค์กับ clock.html
     </div>
   </div>`;
 

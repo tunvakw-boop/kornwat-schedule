@@ -399,21 +399,46 @@ async function loadDate(d){
 }
 
 // ═══════════════ OT CALC ═══════════════
-// Rule: each work period; if >= 6 hours elapsed, deduct 60min break.
+// Regular day rule: each work period; if >= 6 hours elapsed, deduct 60min break.
 // Total worked beyond 8 hours = OT.
-function computeOtFromPeriods(periods){
-  let totalMin = 0;
+// OFF day rule: ALL minutes count as OT (no break deduction, no 8h baseline).
+function computeOtFromPeriods(periods, opts){
+  const isOffDay = !!(opts && opts.isOffDay);
+  let rawMin = 0;
   (periods||[]).forEach(p=>{
     if(!p.in || !p.out) return;
     const [h1,m1] = p.in.split(':').map(Number);
     const [h2,m2] = p.out.split(':').map(Number);
     let mins = (h2*60+m2) - (h1*60+m1);
     if(mins < 0) mins += 24*60; // overnight
+    rawMin += Math.max(0, mins);
+  });
+  if(isOffDay){
+    // Working on a day off = all hours are OT, no break/8h subtraction
+    return {totalMin: 0, otMin: rawMin, rawMin};
+  }
+  // Regular day: deduct break per session, then subtract 8h baseline
+  let totalMin = 0;
+  (periods||[]).forEach(p=>{
+    if(!p.in || !p.out) return;
+    const [h1,m1] = p.in.split(':').map(Number);
+    const [h2,m2] = p.out.split(':').map(Number);
+    let mins = (h2*60+m2) - (h1*60+m1);
+    if(mins < 0) mins += 24*60;
     const workMin = mins >= 360 ? mins - 60 : mins;
     totalMin += Math.max(0, workMin);
   });
   const otMin = Math.max(0, totalMin - 8*60);
-  return {totalMin, otMin};
+  return {totalMin, otMin, rawMin};
+}
+
+// Helper: is this day an OFF day in the schedule?
+function isDayOff(empName, day){
+  if(!monthData) return false;
+  const emp = (monthData.employees||[]).find(e=>e.name===empName);
+  if(!emp) return false;
+  const s = (emp.schedule||{})[day]||'W';
+  return s==='OFF' || s==='REQ_OFF';
 }
 function fmtHours(mins){
   if(!mins) return '0';
@@ -484,17 +509,43 @@ function renderEmpList(){
     html += `</div>`;
   }
   if(offList.length){
-    html += `<div class="section-hd">❌ วันหยุด (${offList.length} คน)</div>`;
+    const offHd = mode==='record'
+      ? `🌙 OT พิเศษ (วันหยุด) (${offList.length} คน) — แตะเพื่อเพิ่มเวลามาทำงาน`
+      : `❌ วันหยุด (${offList.length} คน)`;
+    html += `<div class="section-hd" style="${mode==='record'?'background:#e8d5f5;color:#5d3a8c;':''}">${offHd}</div>`;
     html += `<div style="background:#fff;border-radius:0 0 8px 8px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);">`;
     offList.forEach(info=>{
       const e = info.emp;
+      const ent = info.entry || {};
       const label = info.state==='OFF' ? '<span class="state-badge state-OFF">OFF</span>' : '<span class="state-badge state-REQ_OFF">รีเควส</span>';
-      html += `<div class="emp-card off">
-        <div class="emp-info">
-          <span class="emp-name">${esc(e.name)} ${label}</span>
-          ${e.position?`<span class="emp-pos">${esc(e.position)}</span>`:''}
-        </div>
-      </div>`;
+      if(mode==='record'){
+        const periods = ent.periods || [];
+        const hasOt = periods.length > 0;
+        const stats = hasOt ? computeOtFromPeriods(periods, {isOffDay:true}) : null;
+        const infoHtml = hasOt
+          ? `<span class="emp-time"><span class="ot-tag" style="background:#a855f7;color:#fff;">OT พิเศษ ${fmtHours(stats.otMin)} ชม.</span></span>
+             <span class="emp-time" style="font-size:10px;color:#666;">${periods.map(p=>`${p.in||'?'}-${p.out||'?'}`).join(', ')}</span>`
+          : `<span class="emp-time" style="color:#aaa;">— กดเพื่อเพิ่ม OT พิเศษ —</span>`;
+        const cardCls = hasOt ? 'emp-card has-entry' : 'emp-card';
+        const cardBg = hasOt ? 'background:#faf5ff;' : '';
+        html += `<div class="${cardCls}" style="${cardBg}">
+          <div class="emp-info">
+            <span class="emp-name">${esc(e.name)} ${label}</span>
+            ${e.position?`<span class="emp-pos">${esc(e.position)}</span>`:''}
+            ${infoHtml}
+          </div>
+          <div class="emp-action">
+            <button onclick="openRecordModal('${esc(e.name).replace(/'/g,"\\'")}',${d})" style="background:#a855f7;">${hasOt?'แก้':'+ OT'}</button>
+          </div>
+        </div>`;
+      } else {
+        html += `<div class="emp-card off">
+          <div class="emp-info">
+            <span class="emp-name">${esc(e.name)} ${label}</span>
+            ${e.position?`<span class="emp-pos">${esc(e.position)}</span>`:''}
+          </div>
+        </div>`;
+      }
     });
     html += `</div>`;
   }
@@ -586,15 +637,24 @@ async function saveAssign(empName, day){
 let _periodsDraft = [];
 function openRecordModal(empName, day){
   const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
+  const offDay = isDayOff(empName, day);
   _periodsDraft = (cur.periods && cur.periods.length) ? JSON.parse(JSON.stringify(cur.periods))
-                : [{in: cur.work_start||'08:00', out:''}];
-  document.getElementById('modal-title').textContent = `ลงเวลาทำงาน — ${empName}`;
+                : [{in: cur.work_start||(offDay?'18:00':'08:00'), out:''}];
+  const title = offDay ? `OT พิเศษ (วันหยุด) — ${empName}` : `ลงเวลาทำงาน — ${empName}`;
+  document.getElementById('modal-title').textContent = title;
   renderRecordModal(empName, day);
   document.getElementById('modal-ov').classList.add('show');
 }
 function renderRecordModal(empName, day){
   const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
-  let html = `<p style="font-size:12px;color:#666;margin-bottom:12px;">วันที่ ${fmtDateLabel(curDate)}</p>`;
+  const offDay = isDayOff(empName, day);
+  let html = `<p style="font-size:12px;color:#666;margin-bottom:8px;">วันที่ ${fmtDateLabel(curDate)}</p>`;
+  if(offDay){
+    html += `<div style="background:#faf5ff;border:1px solid #a855f7;padding:8px 10px;border-radius:6px;margin-bottom:12px;font-size:11px;color:#5d3a8c;">
+      🌙 <strong>OT พิเศษวันหยุด</strong> — ทุกนาทีที่มาทำงานคิดเป็น OT ทั้งหมด (40 บาท/ชม.)<br>
+      ไม่หักพักเที่ยง ไม่ลบ 8 ชม.ฐาน
+    </div>`;
+  }
   _periodsDraft.forEach((p,idx)=>{
     html += `<div class="period-row">
       <span class="label">ช่วงที่ ${idx+1}</span>
@@ -617,7 +677,7 @@ function renderRecordModal(empName, day){
     <label>หมายเหตุ</label>
     <input type="text" id="te-note" maxlength="100" value="${esc(cur.note||'')}">
   </div>`;
-  html += `<p style="font-size:10px;color:#888;margin-top:4px;">ค่า OT คงที่ 40 บาท/ชม. · ช่วงเวลา ≥ 6 ชม. หักพักเที่ยง 1 ชม. อัตโนมัติ</p>`;
+  html += `<p style="font-size:10px;color:#888;margin-top:4px;">${offDay?'OT พิเศษ: ค่า OT 40 บาท/ชม. คิดทุกนาที (ไม่หักพักเที่ยง)':'ค่า OT คงที่ 40 บาท/ชม. · ช่วงเวลา ≥ 6 ชม. หักพักเที่ยง 1 ชม. อัตโนมัติ'}</p>`;
   document.getElementById('modal-bd').innerHTML = html;
   document.getElementById('modal-ft').innerHTML = `
     ${(cur.periods&&cur.periods.length)?`<button class="btn-sec" style="background:#ffebee;color:#c62828;" onclick="deleteRecord('${esc(empName).replace(/'/g,"\\'")}',${day})">ลบ</button>`:''}
@@ -640,13 +700,23 @@ function readPeriodsDraft(){
 }
 function updatePeriodStats(){
   readPeriodsDraft();
-  const stats = computeOtFromPeriods(_periodsDraft);
+  // Determine if off-day from modal title
+  const title = document.getElementById('modal-title').textContent;
+  const offDay = title.startsWith('OT พิเศษ');
+  const stats = computeOtFromPeriods(_periodsDraft, {isOffDay:offDay});
   const box = document.getElementById('period-stats-box');
   if(!box) return;
-  box.innerHTML = `<div class="period-stats">
-    <span>ทำงานรวม: <strong>${fmtHours(stats.totalMin)} ชม.</strong></span>
-    <span class="ot">OT: <strong>${fmtHours(stats.otMin)} ชม.</strong></span>
-  </div>`;
+  if(offDay){
+    box.innerHTML = `<div class="period-stats" style="background:#faf5ff;color:#5d3a8c;">
+      <span>เวลามาทำงาน: <strong>${fmtHours(stats.rawMin)} ชม.</strong></span>
+      <span class="ot">OT พิเศษ: <strong>${fmtHours(stats.otMin)} ชม.</strong> (${(stats.otMin/60*40).toFixed(0)} บาท)</span>
+    </div>`;
+  } else {
+    box.innerHTML = `<div class="period-stats">
+      <span>ทำงานรวม: <strong>${fmtHours(stats.totalMin)} ชม.</strong></span>
+      <span class="ot">OT: <strong>${fmtHours(stats.otMin)} ชม.</strong></span>
+    </div>`;
+  }
 }
 function addPeriod(){
   readPeriodsDraft();
@@ -669,13 +739,15 @@ async function saveRecord(empName, day){
   const valid = _periodsDraft.filter(p=>p.in && p.out);
   if(!valid.length){ alert('กรอกอย่างน้อย 1 ช่วงเวลา'); return; }
   const note = document.getElementById('te-note').value.trim();
-  const stats = computeOtFromPeriods(valid);
+  const offDay = isDayOff(empName, day);
+  const stats = computeOtFromPeriods(valid, {isOffDay: offDay});
   const monthKey = dateKey(curDate);
   const cur = timeEntriesForMonth[`${empName}|${day}`] || {};
   try{
     const body = {
       month_key: monthKey, emp_name: empName, day,
-      work_start: cur.work_start || valid[0].in,
+      // For OFF days don't set work_start (keeps it as pure OT, not assigned-day)
+      work_start: offDay ? (cur.work_start || '') : (cur.work_start || valid[0].in),
       ot_min: stats.otMin,
       break_min: 0,
       periods: valid,
@@ -683,7 +755,9 @@ async function saveRecord(empName, day){
     };
     await sbFetch('POST','time_entries?on_conflict=month_key,emp_name,day',[body],{'Prefer':'resolution=merge-duplicates,return=minimal'});
     timeEntriesForMonth[`${empName}|${day}`] = body;
-    closeModal(); renderEmpList(); showToast(`บันทึกแล้ว ✓ (OT ${fmtHours(stats.otMin)} ชม.)`);
+    closeModal(); renderEmpList();
+    const tag = offDay ? `OT พิเศษ ${fmtHours(stats.otMin)} ชม.` : `OT ${fmtHours(stats.otMin)} ชม.`;
+    showToast(`บันทึกแล้ว ✓ (${tag})`);
   }catch(e){ console.error('saveRecord error:',e); showToast('⚠ '+(e.message||'บันทึกไม่สำเร็จ').slice(0,80)); }
 }
 async function deleteRecord(empName, day){
@@ -868,7 +942,7 @@ async function renderReport(){
 
   // Build rows
   const rows = [];
-  let sumWorkMin = 0, sumOtMin = 0, daysCame = 0, daysOff = 0;
+  let sumWorkMin = 0, sumOtMin = 0, daysCame = 0, daysOff = 0, daysOtSpecial = 0;
   for(let d=new Date(fromD); d<=toD; d.setDate(d.getDate()+1)){
     const mk = dateKey(d);
     const day = d.getDate();
@@ -879,30 +953,32 @@ async function renderReport(){
     }
     const empInMonth = (monthInfo.data.employees||[]).find(e=>e.name===emp.name);
     const sched = empInMonth ? ((empInMonth.schedule||{})[day]||'W') : null;
+    const isOffDay = sched==='OFF' || sched==='REQ_OFF';
     const entry = monthInfo.entries[`${emp.name}|${day}`] || {};
     const periods = entry.periods || [];
     let firstIn = '', lastOut = '', workMin = 0;
     if(periods.length){
       firstIn = periods[0].in || '';
       lastOut = periods[periods.length-1].out || '';
-      const stats = computeOtFromPeriods(periods);
-      workMin = stats.totalMin;
+      const stats = computeOtFromPeriods(periods, {isOffDay});
+      workMin = stats.totalMin;  // 0 for OFF days (all is OT)
     } else if(entry.work_start){
-      // Assigned but no actual periods recorded yet — show schedule time as fallback
       firstIn = entry.work_start;
     }
     const otMin = +entry.ot_min || 0;
-    const startEnd = entry.work_start ? `${entry.work_start}-${addHours(entry.work_start, 8)}` : '';
-    // Status
+    const startEnd = isOffDay
+      ? (periods.length ? 'OT พิเศษ' : '')
+      : (entry.work_start ? `${entry.work_start}-${addHours(entry.work_start, 8)}` : '');
     let statusNote = '';
     if(sched==='OFF') statusNote='OFF';
     else if(sched==='REQ_OFF') statusNote='ลา';
     else if(sched==='HALF') statusNote='½';
-    // Unified count: came to work = has work_start OR periods (same as main app payroll)
     const hasEntry = !!(entry.work_start || periods.length>0);
-    rows.push({date:new Date(d), day, mk, monthInfo, sched, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||'', hasEntry});
-    if(hasEntry){ daysCame++; sumWorkMin += workMin; sumOtMin += otMin; }
-    if(sched==='OFF' || sched==='REQ_OFF') daysOff++;
+    rows.push({date:new Date(d), day, mk, monthInfo, sched, isOffDay, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||'', hasEntry});
+    if(hasEntry && !isOffDay){ daysCame++; sumWorkMin += workMin; }
+    if(hasEntry) sumOtMin += otMin;
+    if(isOffDay) daysOff++;
+    if(hasEntry && isOffDay) daysOtSpecial++;
   }
 
   const fromLabel = fromD.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -942,15 +1018,28 @@ async function renderReport(){
     }
     const dowTH = ['อา','จ','อ','พ','พฤ','ศ','ส'][r.date.getDay()];
     const dateLabel = `${String(r.day).padStart(2,'0')}/${String(r.date.getMonth()+1).padStart(2,'0')}/${beYearShort(r.date.getFullYear())} (${dowTH})`;
-    const rowCls = (r.sched==='OFF'||r.sched==='REQ_OFF') ? 'off-row' : (r.hasEntry ? 'has-entry' : '');
-    card += `<tr class="${rowCls}" onclick="editReportRow('${esc(emp.name).replace(/'/g,"\\'")}','${r.mk}',${r.day})">
+    // Color: OT พิเศษ = purple tint; normal entry = green; OFF without OT = pink
+    let rowCls = '';
+    let rowStyle = '';
+    if(r.isOffDay && r.hasEntry){ rowStyle = 'background:#faf5ff;'; }
+    else if(r.isOffDay){ rowCls = 'off-row'; }
+    else if(r.hasEntry){ rowCls = 'has-entry'; }
+    const startEndCell = r.isOffDay
+      ? (r.periods.length
+          ? '<span style="color:#a855f7;font-weight:700;">OT พิเศษ</span>'
+          : (r.statusNote==='OFF'?'<span style="color:#c0392b;">OFF</span>':'<span style="color:#7c2d12;">ลา</span>'))
+      : (esc(r.startEnd) || '—');
+    const noteCell = r.isOffDay && r.hasEntry
+      ? '<span style="color:#a855f7;font-weight:600;">OT พิเศษ</span>' + (r.note?' · '+esc(r.note):'')
+      : (esc(r.note) || (r.statusNote==='OFF'?'หยุดประจำ':r.statusNote==='ลา'?'รีเควสต์':''));
+    card += `<tr class="${rowCls}" style="${rowStyle}" onclick="editReportRow('${esc(emp.name).replace(/'/g,"\\'")}','${r.mk}',${r.day})">
       <td class="date-cell">${dateLabel}</td>
-      <td>${esc(r.startEnd) || (r.statusNote==='OFF'?'<span style="color:#c0392b;">OFF</span>':r.statusNote==='ลา'?'<span style="color:#7c2d12;">ลา</span>':'—')}</td>
+      <td>${startEndCell}</td>
       <td>${esc(r.firstIn)||'—'}</td>
       <td>${esc(r.lastOut)||'—'}</td>
       <td>${r.workMin?fmtHours(r.workMin)+' ชม.':'—'}</td>
       <td>${r.otMin?fmtHours(r.otMin)+' ชม.':'—'}</td>
-      <td class="note-cell">${esc(r.note)||(r.statusNote==='OFF'?'หยุดประจำ':r.statusNote==='ลา'?'รีเควสต์':'')}</td>
+      <td class="note-cell">${noteCell}</td>
     </tr>`;
   });
   card += `</tbody>
@@ -965,7 +1054,7 @@ async function renderReport(){
     </table>
     <div class="rep-summary">
       <div><span>วันที่มา</span><strong>${daysCame}</strong></div>
-      <div><span>วันหยุด</span><strong>${daysOff}</strong></div>
+      <div><span>วันหยุด</span><strong>${daysOff}</strong>${daysOtSpecial?`<br><span style="color:#a855f7;font-size:10px;">+OT พิเศษ ${daysOtSpecial}</span>`:''}</div>
       <div><span>เวลารวม</span><strong>${fmtHours(sumWorkMin)} ชม.</strong></div>
       <div><span>OT รวม</span><strong>${fmtHours(sumOtMin)} ชม.</strong></div>
     </div>
