@@ -1267,13 +1267,15 @@ async function renderReportTab(){
   </div>`;
 
   // ── Build one card per day ──
-  html += `<div id="report-card" style="background:#fff;border:1px solid #d0d7e0;border-radius:8px;padding:14px;margin-bottom:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;border-bottom:2px solid #1565c0;padding-bottom:10px;">
+  // Fixed A4 portrait width (~740px = 21cm at 90dpi) — same size regardless of # of days
+  // Per-day section is fixed structure so prints are consistent across selections
+  html += `<div id="report-card" style="background:#fff;border:1px solid #d0d7e0;border-radius:8px;padding:14px;margin-bottom:12px;width:740px;max-width:100%;box-sizing:border-box;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;border-bottom:2px solid #1565c0;padding-bottom:8px;">
       <div>
-        <div style="font-size:17px;font-weight:800;color:#1565c0;">📋 รายงาน เข้า-ออก ประจำวัน</div>
-        <div style="font-size:12px;color:#666;margin-top:4px;">Kornwat Garden Resort</div>
+        <div style="font-size:16px;font-weight:800;color:#1565c0;">📋 รายงาน เข้า-ออก ประจำวัน</div>
+        <div style="font-size:11px;color:#666;margin-top:3px;">Kornwat Garden Resort</div>
       </div>
-      <div style="text-align:right;font-size:12px;color:#333;">
+      <div style="text-align:right;font-size:11px;color:#333;">
         ${numDays===1
           ? `วันที่ <strong>${fromLabel}</strong>`
           : `จาก <strong>${fromLabel}</strong><br>ถึง <strong>${toLabel}</strong>`}
@@ -1293,18 +1295,16 @@ async function renderReportTab(){
     const ddLabel = `${String(dd).padStart(2,'0')}/${String(mm).padStart(2,'0')}/${beYearShort(yy)}`;
 
     if(!monthInfo){
-      html += `<div style="margin-bottom:14px;padding:10px;background:#fef5f5;border-radius:6px;font-size:12px;color:#888;text-align:center;">
+      html += `<div style="margin-bottom:8px;padding:8px;background:#fef5f5;border-radius:4px;font-size:11px;color:#888;text-align:center;">
         ⚠️ ${dowFull} ${dd} ${MONTH_TH[mm]} ${beYear(yy)} — ยังไม่มีตารางเดือนนี้
       </div>`;
       continue;
     }
 
-    // Day section header (if multi-day)
-    if(numDays > 1){
-      html += `<div style="margin-top:${i===0?'0':'14px'};margin-bottom:6px;padding:6px 10px;background:#e3f2fd;border-left:3px solid #1565c0;border-radius:4px;font-size:13px;font-weight:700;color:#0d47a1;">
-        ${dowFull} ${dd} ${MONTH_TH[mm]} ${beYear(yy)}
-      </div>`;
-    }
+    // Day section header (compact strip — always show even for single day)
+    html += `<div style="margin-top:${i===0?'4px':'8px'};margin-bottom:4px;padding:4px 10px;background:#e3f2fd;border-left:3px solid #1565c0;border-radius:3px;font-size:11px;font-weight:700;color:#0d47a1;">
+      ${dowFull} ${dd} ${MONTH_TH[mm]} ${beYear(yy)}
+    </div>`;
 
     // Build emp rows
     const emps = (monthInfo.employees||[]).filter(e=>e.name);
@@ -1366,55 +1366,57 @@ async function renderReportTab(){
       else if(noteCell.startsWith('½')) noteCell = noteCell.replace('½ ครึ่งวัน','<span style="color:#d97706;font-weight:700;">½ ครึ่งวัน</span>');
 
       tableRows += `<tr style="${rowStyle}">
-        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:700;color:#666;">${idx+1}</td>
-        <td style="padding:5px 6px;border:1px solid #e0e0e0;font-weight:700;color:#c44a1f;">${esc(emp.name)}</td>
-        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;">${schedCell}</td>
-        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:600;">${esc(actIn)||'—'}</td>
-        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;font-size:10px;white-space:nowrap;">${esc(actOut)||'—'}</td>
-        <td style="padding:5px 3px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:700;">${otMin?(otMin/60).toFixed(2)+' ชม.':'—'}</td>
-        <td style="padding:5px 6px;border:1px solid #e0e0e0;font-size:10px;">${noteCell}</td>
+        <td style="padding:3px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:700;color:#666;">${idx+1}</td>
+        <td style="padding:3px 6px;border:1px solid #e0e0e0;font-weight:700;color:#c44a1f;">${esc(emp.name)}</td>
+        <td style="padding:3px 3px;border:1px solid #e0e0e0;text-align:center;">${schedCell}</td>
+        <td style="padding:3px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:600;">${esc(actIn)||'—'}</td>
+        <td style="padding:3px 3px;border:1px solid #e0e0e0;text-align:center;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(actOut)||'—'}</td>
+        <td style="padding:3px 3px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:700;">${otMin?(otMin/60).toFixed(2):'—'}</td>
+        <td style="padding:3px 6px;border:1px solid #e0e0e0;font-size:9px;overflow:hidden;text-overflow:ellipsis;">${noteCell}</td>
       </tr>`;
     });
 
-    html += `<table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed;">
+    // Fixed column widths sized for A4 portrait (sum = 710px to fit inside 740px card)
+    // No 32 | ชื่อ 95 | ตารางเวลา 100 | เข้า 60 | ออก 145 | OT 55 | หมายเหตุ 223
+    html += `<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed;">
       <colgroup>
-        <col style="width:30px;">
-        <col style="width:90px;">
+        <col style="width:32px;">
         <col style="width:95px;">
+        <col style="width:100px;">
         <col style="width:60px;">
-        <col style="width:130px;">
-        <col style="width:65px;">
+        <col style="width:145px;">
+        <col style="width:55px;">
         <col>
       </colgroup>
       <thead>
         <tr style="background:#fef9c4;color:#5d4037;">
-          <th style="padding:6px 3px;border:1px solid #c4a484;">No.</th>
-          <th style="padding:6px;border:1px solid #c4a484;text-align:left;">ชื่อ</th>
-          <th style="padding:6px 3px;border:1px solid #c4a484;">ตารางเวลา</th>
-          <th style="padding:6px 3px;border:1px solid #c4a484;">เข้า</th>
-          <th style="padding:6px 3px;border:1px solid #c4a484;">ออก</th>
-          <th style="padding:6px 3px;border:1px solid #c4a484;">OT</th>
-          <th style="padding:6px;border:1px solid #c4a484;">หมายเหตุ</th>
+          <th style="padding:4px 3px;border:1px solid #c4a484;font-size:10px;">No.</th>
+          <th style="padding:4px;border:1px solid #c4a484;text-align:left;font-size:10px;">ชื่อ</th>
+          <th style="padding:4px 3px;border:1px solid #c4a484;font-size:10px;">ตารางเวลา</th>
+          <th style="padding:4px 3px;border:1px solid #c4a484;font-size:10px;">เข้า</th>
+          <th style="padding:4px 3px;border:1px solid #c4a484;font-size:10px;">ออก</th>
+          <th style="padding:4px 3px;border:1px solid #c4a484;font-size:10px;">OT (ชม.)</th>
+          <th style="padding:4px;border:1px solid #c4a484;font-size:10px;">หมายเหตุ</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
       <tfoot>
         <tr style="background:#fef3e2;font-weight:800;color:#8b4513;">
-          <td colspan="5" style="padding:6px;border:1px solid #c4a484;text-align:right;font-size:11px;">รวม ${emps.length} คน · ทำงาน ${countWork} · หยุด ${countOff}</td>
-          <td style="padding:6px 3px;border:1px solid #c4a484;text-align:center;color:#d97706;">${(sumOtMin/60).toFixed(2)} ชม.</td>
+          <td colspan="5" style="padding:4px;border:1px solid #c4a484;text-align:right;font-size:10px;">รวม ${emps.length} คน · ทำงาน ${countWork} · หยุด ${countOff}</td>
+          <td style="padding:4px 3px;border:1px solid #c4a484;text-align:center;color:#d97706;font-size:10px;">${(sumOtMin/60).toFixed(2)}</td>
           <td style="border:1px solid #c4a484;"></td>
         </tr>
       </tfoot>
     </table>`;
   }
 
-  html += `<p style="text-align:center;font-size:10px;color:#aaa;margin-top:10px;">⏱ ${new Date().toLocaleTimeString('th-TH')}</p>
+  html += `<p style="text-align:center;font-size:9px;color:#aaa;margin-top:6px;">⏱ ${new Date().toLocaleTimeString('th-TH')}</p>
   </div>
 
   <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
     <button class="btn-sec" onclick="renderReportTab()" style="flex:0 0 auto;padding:8px 14px;">🔄 โหลดใหม่</button>
     <button class="btn-pri" onclick="exportNodeAsImage('report-card','รายงาน-${fromLabel}${numDays>1?'_'+toLabel:''}.png')" style="flex:1;min-width:120px;">📷 บันทึกรูป</button>
-    <button class="btn-pri" onclick="exportNodeAsPdf('report-card','รายงาน-${fromLabel}${numDays>1?'_'+toLabel:''}.pdf')" style="flex:1;min-width:120px;">📄 บันทึก PDF</button>
+    <button class="btn-pri" onclick="exportReportPdfPortrait('${fromLabel}${numDays>1?'_'+toLabel:''}')" style="flex:1;min-width:120px;">📄 บันทึก PDF (A4 แนวตั้ง)</button>
   </div>`;
 
   el.innerHTML = html;
@@ -1434,6 +1436,48 @@ function reportPreset(days){
   _reportFrom = isoToday();
   _reportTo = addDaysIso(_reportFrom, days-1);
   renderReportTab();
+}
+
+// Dedicated A4 portrait PDF export for the report card — paginates if content overflows
+async function exportReportPdfPortrait(fname){
+  const node = document.getElementById('report-card'); if(!node) return;
+  if(!window.jspdf){ showToast('⚠ jspdf ไม่พร้อม'); return; }
+  showToast('⏳ กำลังสร้าง PDF...');
+  try{
+    const canvas = await html2canvas(node, {backgroundColor:'#fff', scale:2.2, useCORS:true, allowTaint:true, logging:false});
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait', unit:'pt', format:'a4'});
+    const pageW = pdf.internal.pageSize.getWidth();   // 595pt
+    const pageH = pdf.internal.pageSize.getHeight();  // 842pt
+    const margin = 20;
+    const usableW = pageW - margin*2;
+    const usableH = pageH - margin*2;
+
+    const cw = canvas.width, ch = canvas.height;
+    const scale = usableW / cw;
+    const drawW = usableW;
+    const drawH = ch * scale;
+
+    if(drawH <= usableH){
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG', margin, margin, drawW, drawH);
+    } else {
+      // Paginate vertically
+      const sliceH = usableH / scale;  // source pixels per page
+      let y = 0;
+      while(y < ch){
+        const curSliceH = Math.min(sliceH, ch - y);
+        const slice = document.createElement('canvas');
+        slice.width = cw; slice.height = curSliceH;
+        const ctx = slice.getContext('2d');
+        ctx.drawImage(canvas, 0, y, cw, curSliceH, 0, 0, cw, curSliceH);
+        if(y > 0) pdf.addPage('a4','portrait');
+        pdf.addImage(slice.toDataURL('image/png'),'PNG', margin, margin, drawW, curSliceH * scale);
+        y += sliceH;
+      }
+    }
+    pdf.save(`รายงาน-${fname}.pdf`);
+    showToast('📄 บันทึก PDF แล้ว (A4 แนวตั้ง)');
+  }catch(e){ console.error(e); showToast('⚠ '+(e.message||'').slice(0,80)); }
 }
 function shiftReportRange(direction){
   const numDays = daysBetween(_reportFrom, _reportTo);
@@ -1529,7 +1573,7 @@ async function renderPayroll(){
         <div style="font-size:10px;color:#666;">${typeLbl}${e.position?` · ${esc(e.position)}`:''} ${unitLbl}</div>
       </td>
       <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#1565c0;font-weight:700;">${r.daysWorked}</td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}${r.daysOtSpecial?`<br><span style="font-size:9px;color:#a855f7;">(OT พิเศษ ${r.daysOtSpecial})</span>`:''}</td>
+      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)}</td>
       <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:600;">${fmtNum(r.otHours)}</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#d97706;font-weight:700;">${fmt$(r.otPay)}</td>
