@@ -1286,7 +1286,7 @@ async function renderPayroll(){
       • <strong>รายวัน (พาสไทม์/ฝึกงาน)</strong>: ฐาน = ค่าจ้าง × วันทำงาน<br>
       • <strong>ค่า OT</strong> = (OT นาทีรวม ÷ 60) × <strong>${OT_RATE_PER_HOUR} บาท/ชม.</strong><br>
       • วัน OFF + OT: ทุกนาทีคิดเป็น OT (ไม่หักพักเที่ยง ไม่ลบ 8 ชม.)<br>
-      • วัน W/HALF + OT: หักพักเที่ยง 1 ชม. ถ้า session ≥ 6 ชม. แล้วค่อยลบ 8 ชม.<br>
+      • วัน W/HALF + OT: หักพักเที่ยง 1 ชม. ถ้าช่วงเดียวยาว ≥ 9 ชม. (ถ้าหลายช่วงไม่หัก)<br>
       • <strong>รวม</strong> = เงินเดือน + ค่า OT (ไม่มีหักลด) · ซิงค์กับ clock.html
     </div>
   </div>`;

@@ -77,7 +77,7 @@ body{background:#fef9e7;min-height:100dvh;display:flex;flex-direction:column;col
 .rep-tbl tr.has-entry td{background:#f0fdf4;}
 .rep-tbl tr:hover{background:#fef9e7;cursor:pointer;}
 .rep-tbl tfoot td{background:#fef0e0;font-weight:700;color:#c44a1f;}
-.rep-tbl td.date-cell{text-align:left;padding-left:8px;font-weight:600;}
+.rep-tbl td.date-cell{text-align:left;padding-left:8px;font-weight:600;white-space:nowrap;}
 .rep-tbl td.note-cell{text-align:left;font-size:10px;color:#666;}
 .rep-summary{display:flex;gap:14px;margin-top:14px;padding:10px;background:#e8f4fd;border-radius:6px;flex-wrap:wrap;}
 .rep-summary div{flex:1;text-align:center;min-width:100px;}
@@ -399,7 +399,9 @@ async function loadDate(d){
 }
 
 // ═══════════════ OT CALC ═══════════════
-// Regular day rule: each work period; if >= 6 hours elapsed, deduct 60min break.
+// Regular day rule: each work period; if >= 9 hours elapsed, deduct 60min break
+// (assumes 8h work + 1h lunch break embedded in long session).
+// Otherwise, no break deduction (worker rested between split periods).
 // Total worked beyond 8 hours = OT.
 // OFF day rule: ALL minutes count as OT (no break deduction, no 8h baseline).
 function computeOtFromPeriods(periods, opts){
@@ -414,10 +416,9 @@ function computeOtFromPeriods(periods, opts){
     rawMin += Math.max(0, mins);
   });
   if(isOffDay){
-    // Working on a day off = all hours are OT, no break/8h subtraction
     return {totalMin: 0, otMin: rawMin, rawMin};
   }
-  // Regular day: deduct break per session, then subtract 8h baseline
+  // Regular day: deduct break only if a single period >= 9h (8h work + 1h break embedded)
   let totalMin = 0;
   (periods||[]).forEach(p=>{
     if(!p.in || !p.out) return;
@@ -425,7 +426,7 @@ function computeOtFromPeriods(periods, opts){
     const [h2,m2] = p.out.split(':').map(Number);
     let mins = (h2*60+m2) - (h1*60+m1);
     if(mins < 0) mins += 24*60;
-    const workMin = mins >= 360 ? mins - 60 : mins;
+    const workMin = mins >= 540 ? mins - 60 : mins;  // threshold: 9 hours
     totalMin += Math.max(0, workMin);
   });
   const otMin = Math.max(0, totalMin - 8*60);
@@ -710,7 +711,7 @@ function renderRecordModal(empName, day){
     <label>หมายเหตุ</label>
     <input type="text" id="te-note" maxlength="100" value="${esc(cur.note||'')}">
   </div>`;
-  html += `<p style="font-size:10px;color:#888;margin-top:4px;">${offDay?'OT พิเศษ: ค่า OT 40 บาท/ชม. คิดทุกนาที (ไม่หักพักเที่ยง)':'ค่า OT คงที่ 40 บาท/ชม. · ช่วงเวลา ≥ 6 ชม. หักพักเที่ยง 1 ชม. อัตโนมัติ'}</p>`;
+  html += `<p style="font-size:10px;color:#888;margin-top:4px;">${offDay?'OT พิเศษ: ค่า OT 40 บาท/ชม. คิดทุกนาที (ไม่หักพักเที่ยง)':'ค่า OT คงที่ 40 บาท/ชม. · ช่วงเวลา ≥ 9 ชม. หักพักเที่ยง 1 ชม. อัตโนมัติ (ถ้าหลายช่วงไม่หัก)'}</p>`;
   document.getElementById('modal-bd').innerHTML = html;
   document.getElementById('modal-ft').innerHTML = `
     ${(cur.periods&&cur.periods.length)?`<button class="btn-sec" style="background:#ffebee;color:#c62828;" onclick="deleteRecord('${esc(empName).replace(/'/g,"\\'")}',${day})">ลบ</button>`:''}
@@ -1048,10 +1049,10 @@ async function renderReport(){
     <table class="rep-tbl">
       <thead>
         <tr>
-          <th style="width:80px;">วันที่</th>
+          <th style="width:100px;white-space:nowrap;">วันที่</th>
           <th style="width:90px;">ตารางเวลา</th>
           <th style="width:60px;">เข้า</th>
-          <th style="width:60px;">ออก</th>
+          <th style="width:120px;">ออก</th>
           <th style="width:70px;">เวลารวม</th>
           <th style="width:60px;">OT</th>
           <th>หมายเหตุ</th>
@@ -1065,25 +1066,50 @@ async function renderReport(){
     }
     const dowTH = ['อา','จ','อ','พ','พฤ','ศ','ส'][r.date.getDay()];
     const dateLabel = `${String(r.day).padStart(2,'0')}/${String(r.date.getMonth()+1).padStart(2,'0')}/${beYearShort(r.date.getFullYear())} (${dowTH})`;
-    // Color: OT พิเศษ = purple tint; normal entry = green; OFF without OT = pink
+    // Row color
     let rowCls = '';
     let rowStyle = '';
     if(r.isOffDay && r.hasEntry){ rowStyle = 'background:#faf5ff;'; }
     else if(r.isOffDay){ rowCls = 'off-row'; }
     else if(r.hasEntry){ rowCls = 'has-entry'; }
+
+    // (3) Schedule time column: always show OFF/ลา for off days (no "OT พิเศษ" here)
     const startEndCell = r.isOffDay
-      ? (r.periods.length
-          ? '<span style="color:#a855f7;font-weight:700;">OT พิเศษ</span>'
-          : (r.statusNote==='OFF'?'<span style="color:#c0392b;">OFF</span>':'<span style="color:#7c2d12;">ลา</span>'))
+      ? (r.statusNote==='OFF'?'<span style="color:#c0392b;font-weight:700;">OFF</span>':'<span style="color:#7c2d12;font-weight:700;">ลา</span>')
       : (esc(r.startEnd) || '—');
-    const noteCell = r.isOffDay && r.hasEntry
-      ? '<span style="color:#a855f7;font-weight:600;">OT พิเศษ</span>' + (r.note?' · '+esc(r.note):'')
-      : (esc(r.note) || (r.statusNote==='OFF'?'หยุดประจำ':r.statusNote==='ลา'?'รีเควสต์':''));
+
+    // (4) Out column: if multiple periods, show "out1, in2-out2, in3-out3, ..."
+    let outCell = '—';
+    if(r.periods && r.periods.length){
+      if(r.periods.length === 1){
+        outCell = esc(r.periods[0].out || '');
+      } else {
+        const parts = [esc(r.periods[0].out || '')];
+        for(let i=1; i<r.periods.length; i++){
+          parts.push(`${esc(r.periods[i].in||'')}-${esc(r.periods[i].out||'')}`);
+        }
+        outCell = parts.join(', ');
+      }
+    } else if(r.lastOut){
+      outCell = esc(r.lastOut);
+    }
+
+    // (1)(3) Note column: OT พิเศษ moved here; "วันหยุด" for OFF without OT
+    let noteCell = '';
+    if(r.isOffDay && r.hasEntry){
+      noteCell = '<span style="color:#a855f7;font-weight:700;">OT พิเศษ</span>' + (r.note?' · '+esc(r.note):'');
+    } else if(r.isOffDay){
+      noteCell = r.statusNote==='ลา' ? 'ลา' : 'วันหยุด';
+      if(r.note) noteCell += ' · '+esc(r.note);
+    } else {
+      noteCell = esc(r.note) || '';
+    }
+
     card += `<tr class="${rowCls}" style="${rowStyle}" onclick="editReportRow('${esc(emp.name).replace(/'/g,"\\'")}','${r.mk}',${r.day})">
       <td class="date-cell">${dateLabel}</td>
       <td>${startEndCell}</td>
       <td>${esc(r.firstIn)||'—'}</td>
-      <td>${esc(r.lastOut)||'—'}</td>
+      <td style="white-space:nowrap;font-size:10px;">${outCell}</td>
       <td>${r.workMin?fmtHours(r.workMin)+' ชม.':'—'}</td>
       <td>${r.otMin?fmtHours(r.otMin)+' ชม.':'—'}</td>
       <td class="note-cell">${noteCell}</td>
@@ -1100,10 +1126,14 @@ async function renderReport(){
       </tfoot>
     </table>
     <div class="rep-summary">
-      <div><span>วันที่มา</span><strong>${daysCame}</strong></div>
-      <div><span>วันหยุด</span><strong>${daysOff}</strong>${daysOtSpecial?`<br><span style="color:#a855f7;font-size:10px;">+OT พิเศษ ${daysOtSpecial}</span>`:''}</div>
-      <div><span>เวลารวม</span><strong>${fmtHours(sumWorkMin)} ชม.</strong></div>
+      <div><span>วันทำงาน</span><strong>${daysCame}</strong></div>
+      <div><span>วันหยุด</span><strong>${daysOff}</strong></div>
       <div><span>OT รวม</span><strong>${fmtHours(sumOtMin)} ชม.</strong></div>
+      <div style="text-align:center;">
+        <span style="color:#666;">ลายเซ็น</span>
+        <div style="margin-top:18px;border-bottom:1.5px solid #333;height:1px;width:80%;margin-left:auto;margin-right:auto;"></div>
+        <div style="font-size:10px;color:#666;margin-top:4px;">(................................)</div>
+      </div>
     </div>
     <p style="font-size:10px;color:#888;margin-top:8px;text-align:center;">แตะแถวเพื่อแก้ไขเวลาทำงานของวันนั้น</p>
   </div>`;
