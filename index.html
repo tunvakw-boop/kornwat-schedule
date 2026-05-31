@@ -448,6 +448,7 @@ async function init(){
   ensurePositionField(data);
   ensureSalaryField(data);
   ensureExpensesField(data);
+  ensureAdvancesField(data);
   migrateToHolidayModel(data);
   // Load meta (lastSavedAt + dirty flag)
   try{
@@ -547,6 +548,15 @@ function ensureExpensesField(d){
   });
 }
 
+// Cash advances per employee per month: [{date, amount, note}, ...]
+function ensureAdvancesField(d){
+  Object.values(d).forEach(m=>{
+    (m.employees||[]).forEach(e=>{
+      if(!Array.isArray(e.advances)) e.advances = [];
+    });
+  });
+}
+
 // Fixed OT rate (baht/hour) — same for everyone
 const OT_RATE_PER_HOUR = 40;
 
@@ -630,6 +640,7 @@ async function syncFromCloud(){
       ensurePositionField(cloudData);
       ensureSalaryField(cloudData);
       ensureExpensesField(cloudData);
+      ensureAdvancesField(cloudData);
       migrateToHolidayModel(cloudData);
       data = cloudData;
       saveLocal();
@@ -1531,8 +1542,11 @@ async function renderPayroll(){
     const basePay = (su==='month') ? salary : salary * daysWorked;
     const otHours = totalOtMin / 60;
     const otPay = otHours * OT_RATE_PER_HOUR;
-    const total = basePay + otPay;
-    rows.push({emp, daysWorked, daysOff, daysOtSpecial, totalOtMin, otHours, basePay, otPay, total, su, salary});
+    const advances = Array.isArray(emp.advances) ? emp.advances : [];
+    const advanceTotal = advances.reduce((s,a)=>s + (parseFloat(a.amount)||0), 0);
+    const advanceCount = advances.length;
+    const total = basePay + otPay - advanceTotal;  // net pay after advance deduction
+    rows.push({emp, daysWorked, daysOff, daysOtSpecial, totalOtMin, otHours, basePay, otPay, advanceTotal, advanceCount, total, su, salary});
   });
 
   const sumDays  = rows.reduce((s,r)=>s+r.daysWorked, 0);
@@ -1540,6 +1554,7 @@ async function renderPayroll(){
   const sumBase  = rows.reduce((s,r)=>s+r.basePay,  0);
   const sumOtHr  = rows.reduce((s,r)=>s+r.otHours,  0);
   const sumOt    = rows.reduce((s,r)=>s+r.otPay,    0);
+  const sumAdv   = rows.reduce((s,r)=>s+r.advanceTotal, 0);
   const sumTotal = rows.reduce((s,r)=>s+r.total,    0);
 
   const firstDay = `01/${String(m.month).padStart(2,'0')}/${beYearShort(m.year)}`;
@@ -1561,12 +1576,13 @@ async function renderPayroll(){
         <tr style="background:#fef9c4;color:#5d4037;">
           <th style="width:30px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">No.</th>
           <th style="padding:8px 6px;border:1px solid #c4a484;text-align:left;">ชื่อ</th>
-          <th style="width:65px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">วันทำงาน</th>
-          <th style="width:55px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">วันหยุด</th>
-          <th style="width:90px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">เงินเดือน</th>
-          <th style="width:60px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">OT (ชม.)</th>
-          <th style="width:75px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">OT (บาท)</th>
-          <th style="width:90px;padding:8px 4px;border:1px solid #c4a484;text-align:center;background:#fef0e0;">รวม</th>
+          <th style="width:60px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">วันทำงาน</th>
+          <th style="width:50px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">วันหยุด</th>
+          <th style="width:85px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">เงินเดือน</th>
+          <th style="width:55px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">OT (ชม.)</th>
+          <th style="width:70px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">OT (บาท)</th>
+          <th style="width:80px;padding:8px 4px;border:1px solid #c4a484;text-align:center;background:#ffebee;">เบิก</th>
+          <th style="width:85px;padding:8px 4px;border:1px solid #c4a484;text-align:center;background:#fef0e0;">สุทธิ</th>
           <th style="width:60px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">การกระทำ</th>
         </tr>
       </thead>
@@ -1586,6 +1602,7 @@ async function renderPayroll(){
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)}</td>
       <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:600;">${fmtNum(r.otHours)}</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#d97706;font-weight:700;">${fmt$(r.otPay)}</td>
+      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#c62828;font-weight:700;background:${r.advanceTotal?'#ffebee':'#fff'};cursor:pointer;" onclick="showAdvancesModal('${esc(r.emp.name).replace(/'/g,"\\'")}')" title="แตะเพื่อจัดการเบิกล่วงหน้า">${r.advanceTotal?fmt$(r.advanceTotal)+`<br><span style="font-size:9px;color:#c62828;font-weight:400;">(${r.advanceCount} ครั้ง)</span>`:`<span style="color:#bbb;font-weight:400;">+ เบิก</span>`}</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#c44a1f;font-weight:800;background:#fef9e7;">${fmt$(r.total)}</td>
       <td style="padding:4px;border:1px solid #e0e0e0;text-align:center;">
         <div style="display:flex;gap:3px;justify-content:center;">
@@ -1613,6 +1630,7 @@ async function renderPayroll(){
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#7a5d20;font-weight:700;">${fmt$(amt)}</td>
       <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#bbb;">—</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#bbb;">—</td>
+      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#bbb;">—</td>
       <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#7a5d20;font-weight:800;background:#fef9c4;">${fmt$(amt)}</td>
       <td style="padding:4px;border:1px solid #e0e0e0;text-align:center;">
         <div style="display:flex;gap:3px;justify-content:center;">
@@ -1625,7 +1643,7 @@ async function renderPayroll(){
 
   // Add expense button row
   html += `<tr>
-    <td colspan="9" style="padding:6px;border:1px solid #e0e0e0;background:#fffdf5;">
+    <td colspan="10" style="padding:6px;border:1px solid #e0e0e0;background:#fffdf5;">
       <button onclick="addExpense()" style="width:100%;padding:8px;background:#fef3e2;color:#c44a1f;border:1.5px dashed #e07b54;border-radius:6px;font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
         + เพิ่มค่าใช้จ่ายประจำ
       </button>
@@ -1646,6 +1664,7 @@ async function renderPayroll(){
           <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#2e7d32;">${fmt$(sumBase)}</td>
           <td style="padding:8px 4px;border:1px solid #c4a484;text-align:center;color:#d97706;">${fmtNum(sumOtHr)}</td>
           <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#d97706;">${fmt$(sumOt)}</td>
+          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#c62828;background:#ffebee;">${sumAdv?'−'+fmt$(sumAdv):'—'}</td>
           <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#c44a1f;background:#fef0e0;">${fmt$(sumTotal)}</td>
           <td style="border:1px solid #c4a484;"></td>
         </tr>
@@ -1654,11 +1673,12 @@ async function renderPayroll(){
           <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;">${fmt$(expTotal)}</td>
           <td style="padding:8px 4px;border:1px solid #c4a484;"></td>
           <td style="padding:8px 6px;border:1px solid #c4a484;"></td>
+          <td style="padding:8px 6px;border:1px solid #c4a484;"></td>
           <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;background:#fef9c4;">${fmt$(expTotal)}</td>
           <td style="border:1px solid #c4a484;"></td>
         </tr>`:''}
         <tr style="background:#c44a1f;color:#fff;font-weight:800;font-size:13px;">
-          <td colspan="7" style="padding:10px 6px;border:1px solid #c4a484;text-align:right;">รวมทั้งสิ้น (${totalItems} รายการ)</td>
+          <td colspan="8" style="padding:10px 6px;border:1px solid #c4a484;text-align:right;">รวมทั้งสิ้น (${totalItems} รายการ${sumAdv?` · หักเบิกแล้ว ${fmt$(sumAdv)}`:''})</td>
           <td style="padding:10px 6px;border:1px solid #c4a484;text-align:right;font-size:14px;">${fmt$(grandTotal)}</td>
           <td style="border:1px solid #c4a484;"></td>
         </tr>
@@ -1679,6 +1699,7 @@ async function renderPayroll(){
     <div style="padding:12px;font-size:12px;line-height:1.7;color:#5d4037;">
       • <strong>วันทำงาน</strong> = วันที่ schedule = W/HALF <strong>และ</strong> มีลงเวลา (ไม่นับวันหยุด)<br>
       • <strong>ค่าใช้จ่ายประจำ</strong> = รายการคงที่ของเดือน (ไม่เกี่ยวกับตาราง/ลงเวลา) ลำดับต่อจากพนักงาน · แตะ ✏ แก้ ปุ่ม 🗑 ลบ<br>
+      • <strong>เบิก (เบิกล่วงหน้า)</strong> = แตะช่องเพื่อจัดการเงินเบิก · หักจาก สุทธิ ทันทีในเดือนเดียวกัน · ไม่ยกข้ามเดือน<br>
       • <strong>วันหยุด</strong> = OFF + รีเควสต์ตามตาราง (รวมวันที่มา OT พิเศษด้วย)<br>
       • <strong>(OT พิเศษ N)</strong> = วันหยุดที่พนักงานมาทำงาน → คิดเป็น OT 100% (ไม่นับเป็นวันทำงาน)<br>
       • <strong>เงินเดือนประจำ</strong>: ฐานคงที่เต็มเดือน ไม่หักขาด<br>
@@ -1768,6 +1789,97 @@ function delExpense(idx){
   if(!confirm(`ลบรายการ "${exp.name}"?`)) return;
   m.expenses.splice(idx,1);
   saveLocal(); markDirty(); renderPayroll();
+  showToast('ลบแล้ว');
+}
+
+// ── CASH ADVANCE management ──
+function showAdvancesModal(empName){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const m = data[curKey];
+  const emp = (m.employees||[]).find(e=>e.name===empName);
+  if(!emp) return;
+  if(!Array.isArray(emp.advances)) emp.advances = [];
+  renderAdvancesModal(empName);
+  document.getElementById('modal-ov').classList.remove('hidden');
+}
+function renderAdvancesModal(empName){
+  const m = data[curKey];
+  const emp = (m.employees||[]).find(e=>e.name===empName);
+  if(!emp) return;
+  const advances = emp.advances || [];
+  const total = advances.reduce((s,a)=>s+(parseFloat(a.amount)||0),0);
+  const today = `${m.year}-${String(m.month).padStart(2,'0')}-${String(new Date().getDate()<=m.days?new Date().getDate():1).padStart(2,'0')}`;
+
+  let listHtml = '';
+  if(advances.length){
+    listHtml = `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px;">
+      <thead><tr style="background:#fef9c4;color:#5d4037;">
+        <th style="padding:5px;border:1px solid #c4a484;width:90px;">วันที่</th>
+        <th style="padding:5px;border:1px solid #c4a484;width:80px;">จำนวน</th>
+        <th style="padding:5px;border:1px solid #c4a484;text-align:left;">หมายเหตุ</th>
+        <th style="padding:5px;border:1px solid #c4a484;width:60px;"></th>
+      </tr></thead><tbody>`;
+    advances.forEach((a,i)=>{
+      const dateD = a.date ? a.date.split('-') : ['','',''];
+      const dispDate = dateD.length===3 ? `${dateD[2]}/${dateD[1]}/${beYearShort(+dateD[0])}` : '—';
+      listHtml += `<tr>
+        <td style="padding:5px;border:1px solid #e0e0e0;text-align:center;font-size:11px;">${dispDate}</td>
+        <td style="padding:5px;border:1px solid #e0e0e0;text-align:right;color:#c62828;font-weight:700;">${fmt$(a.amount)}</td>
+        <td style="padding:5px;border:1px solid #e0e0e0;font-size:11px;">${esc(a.note||'')}</td>
+        <td style="padding:3px;border:1px solid #e0e0e0;text-align:center;">
+          <button class="btn-sm btn-del" onclick="delAdvance('${esc(empName).replace(/'/g,"\\'")}',${i})" style="padding:2px 6px;font-size:11px;">🗑</button>
+        </td>
+      </tr>`;
+    });
+    listHtml += `<tr style="background:#ffebee;font-weight:800;color:#c62828;">
+      <td style="padding:6px;border:1px solid #c4a484;text-align:right;">รวม (${advances.length})</td>
+      <td style="padding:6px;border:1px solid #c4a484;text-align:right;">${fmt$(total)}</td>
+      <td colspan="2" style="padding:6px;border:1px solid #c4a484;"></td>
+    </tr>`;
+    listHtml += `</tbody></table>`;
+  } else {
+    listHtml = `<p style="font-size:11px;color:#888;text-align:center;padding:14px;background:#fafafa;border-radius:6px;margin-bottom:10px;">— ยังไม่มีรายการเบิก —</p>`;
+  }
+
+  openModal(`💸 เบิกล่วงหน้า — ${empName}`,
+    `${listHtml}
+     <div style="background:#fef3e2;padding:10px;border-radius:6px;">
+       <div style="font-size:12px;color:#8b4513;font-weight:700;margin-bottom:8px;">+ เพิ่มรายการใหม่</div>
+       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+         <input type="date" id="adv-date" value="${today}" style="padding:7px;border:1px solid #f4b8a0;border-radius:5px;font-size:13px;font-family:'Sarabun',sans-serif;background:#fff;">
+         <input type="number" id="adv-amount" min="0" step="1" placeholder="จำนวน (บาท)" style="padding:7px;border:1px solid #f4b8a0;border-radius:5px;font-size:13px;font-family:'Sarabun',sans-serif;background:#fff;">
+       </div>
+       <input type="text" id="adv-note" maxlength="80" placeholder="หมายเหตุ (ไม่บังคับ)" style="width:100%;padding:7px;border:1px solid #f4b8a0;border-radius:5px;font-size:13px;font-family:'Sarabun',sans-serif;background:#fff;margin-bottom:6px;">
+       <button class="btn-pri" onclick="addAdvance('${esc(empName).replace(/'/g,"\\'")}')" style="width:100%;font-size:13px;padding:8px;">+ เพิ่ม</button>
+     </div>`,
+    `<button class="btn-pri" onclick="closeModal()">ปิด</button>`);
+}
+function addAdvance(empName){
+  const date = document.getElementById('adv-date').value;
+  const amount = parseFloat(document.getElementById('adv-amount').value)||0;
+  const note = document.getElementById('adv-note').value.trim();
+  if(!date){ alert('เลือกวันที่'); return; }
+  if(amount<=0){ alert('จำนวนเงินต้อง > 0'); return; }
+  const m = data[curKey];
+  const emp = (m.employees||[]).find(e=>e.name===empName); if(!emp) return;
+  if(!Array.isArray(emp.advances)) emp.advances = [];
+  emp.advances.push({date, amount: String(amount), note});
+  // Sort by date asc
+  emp.advances.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  saveLocal(); markDirty();
+  renderAdvancesModal(empName);  // refresh list in modal
+  renderPayroll();  // refresh table behind
+  showToast(`+ ${fmt$(amount)} บาท`);
+}
+function delAdvance(empName, idx){
+  const m = data[curKey];
+  const emp = (m.employees||[]).find(e=>e.name===empName); if(!emp) return;
+  const a = (emp.advances||[])[idx]; if(!a) return;
+  if(!confirm(`ลบรายการเบิก ${fmt$(a.amount)} บาท?`)) return;
+  emp.advances.splice(idx,1);
+  saveLocal(); markDirty();
+  renderAdvancesModal(empName);
+  renderPayroll();
   showToast('ลบแล้ว');
 }
 
@@ -2293,7 +2405,7 @@ function moveEmp(ei, dir){
 }
 async function resetAll(){
   if(!confirm('รีเซ็ตข้อมูลทั้งหมด? การแก้ไขจะหายไป')) return;
-  data=clone(EXCEL); ensurePositionField(data); ensureSalaryField(data); ensureExpensesField(data); migrateToHolidayModel(data);
+  data=clone(EXCEL); ensurePositionField(data); ensureSalaryField(data); ensureExpensesField(data); ensureAdvancesField(data); migrateToHolidayModel(data);
   saveLocal();
   await pushAllNow();
   render(); renderManage();
