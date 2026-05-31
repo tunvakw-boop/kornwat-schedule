@@ -1029,10 +1029,18 @@ async function renderReport(){
     const dayAdvances = (empInMonth?.advances||[]).filter(a=>a.date===isoDay);
     const dayAdvAmount = dayAdvances.reduce((s,a)=>s+(parseFloat(a.amount)||0),0);
     rows.push({date:new Date(d), day, mk, monthInfo, sched, isOffDay, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||'', hasEntry, dayAdvances, dayAdvAmount});
-    if(hasEntry && !isOffDay){ daysCame++; sumWorkMin += workMin; }
+    const isHalfDay = sched==='HALF';
+    // HALF = 0.5/0.5 split between worked and off
+    if(isOffDay){
+      daysOff++;
+      if(hasEntry) daysOtSpecial++;
+    } else if(isHalfDay){
+      daysOff += 0.5;
+      if(hasEntry){ daysCame += 0.5; sumWorkMin += workMin; }
+    } else {
+      if(hasEntry){ daysCame++; sumWorkMin += workMin; }
+    }
     if(hasEntry) sumOtMin += otMin;
-    if(isOffDay) daysOff++;
-    if(hasEntry && isOffDay) daysOtSpecial++;
     if(dayAdvAmount > 0){ sumAdvances += dayAdvAmount; advCount += dayAdvances.length; }
   }
   function fmtMoney(n){ return Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:2}); }

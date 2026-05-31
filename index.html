@@ -1539,15 +1539,23 @@ async function renderPayroll(){
       const e = entries[`${emp.name}|${d}`];
       const sched = (emp.schedule||{})[d]||'W';
       const isOffDay = sched==='OFF' || sched==='REQ_OFF';
+      const isHalf = sched==='HALF';
       const has = hasWorkEntry(e);
       // Counting rules:
-      // - Regular work day with entry → daysWorked
-      // - OFF day with entry (came for OT) → daysOff still counts, daysOtSpecial++ (info)
-      // - OT minutes summed regardless of schedule (OT พิเศษ counts too)
-      if(has && !isOffDay) daysWorked++;
-      if(has && isOffDay) daysOtSpecial++;
+      // - W + has entry → +1 daysWorked
+      // - HALF: always +0.5 daysOff (scheduled). If has entry → +0.5 daysWorked
+      // - OFF/REQ_OFF: +1 daysOff. If has entry → daysOtSpecial (OT พิเศษ, not work)
+      // - OT minutes sum regardless of schedule
+      if(isOffDay){
+        daysOff++;
+        if(has) daysOtSpecial++;
+      } else if(isHalf){
+        daysOff += 0.5;
+        if(has) daysWorked += 0.5;
+      } else { // W
+        if(has) daysWorked++;
+      }
       if(has) totalOtMin += +e.ot_min||0;
-      if(isOffDay) daysOff++;
     }
     const salary = parseFloat(emp.salary)||0;
     const su = emp.salaryUnit || (emp.type==='regular'?'month':'day');
@@ -1611,8 +1619,8 @@ async function renderPayroll(){
         <div style="font-weight:700;color:#000;font-size:14px;">${esc(e.name)}</div>
         <div style="font-size:11px;color:#555;">${typeLbl}${e.position?` · ${esc(e.position)}`:''} ${unitLbl}</div>
       </td>
-      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#1565c0;font-weight:700;">${r.daysWorked}</td>
-      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}</td>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#1565c0;font-weight:700;">${fmtNum(r.daysWorked)}</td>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#c0392b;font-weight:600;">${fmtNum(r.daysOff)}</td>
       <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)}</td>
       <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#000;font-weight:700;">${fmtNum(r.otHours)}</td>
       <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#000;font-weight:700;">${fmt$(r.otPay)}</td>
@@ -1675,8 +1683,8 @@ async function renderPayroll(){
       <tfoot>
         <tr style="background:#fef3e2;font-weight:800;color:#000;">
           <td colspan="2" style="padding:9px 6px;border:1.5px solid #555;text-align:right;font-size:13px;">รวมพนักงาน : ${totalEmps}</td>
-          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#1565c0;">${sumDays}</td>
-          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#c0392b;">${sumOff}</td>
+          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#1565c0;">${fmtNum(sumDays)}</td>
+          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#c0392b;">${fmtNum(sumOff)}</td>
           <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#2e7d32;">${fmt$(sumBase)}</td>
           <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#000;">${fmtNum(sumOtHr)}</td>
           <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#000;">${fmt$(sumOt)}</td>
@@ -2053,23 +2061,33 @@ async function renderSummary(){
       const entry = entries[`${emp.name}|${d}`];
       const periods = entry?.periods||[];
       const has = !!(entry && (entry.work_start || periods.length));
-      if(isOffDay) daysOff++;
-      if(isHalf) daysHalf++;
-      if(has && !isOffDay){
-        daysWorked++;
-        const s = computeOtFromPeriodsMain(periods, false);
-        workMin += s.totalMin;
-        // Track arrival pattern
-        if(entry.work_start){
-          const [h,mm] = entry.work_start.split(':').map(Number);
-          const startMin = h*60+mm;
-          sumStartMin += startMin;
-          startCount++;
-          if(!earliestStart || startMin < (parseInt(earliestStart.split(':')[0])*60+parseInt(earliestStart.split(':')[1]))) earliestStart = entry.work_start;
-          if(!latestStart || startMin > (parseInt(latestStart.split(':')[0])*60+parseInt(latestStart.split(':')[1]))) latestStart = entry.work_start;
+      // HALF day counts 0.5/0.5 split between worked and off
+      if(isOffDay){
+        daysOff++;
+        if(has) daysOtSpecial++;
+      } else if(isHalf){
+        daysHalf++;
+        daysOff += 0.5;
+        if(has){
+          daysWorked += 0.5;
+          const s = computeOtFromPeriodsMain(periods, false);
+          workMin += s.totalMin;
+        }
+      } else { // W
+        if(has){
+          daysWorked++;
+          const s = computeOtFromPeriodsMain(periods, false);
+          workMin += s.totalMin;
         }
       }
-      if(has && isOffDay) daysOtSpecial++;
+      if(has && entry.work_start && !isOffDay){
+        const [h,mm] = entry.work_start.split(':').map(Number);
+        const startMin = h*60+mm;
+        sumStartMin += startMin;
+        startCount++;
+        if(!earliestStart || startMin < (parseInt(earliestStart.split(':')[0])*60+parseInt(earliestStart.split(':')[1]))) earliestStart = entry.work_start;
+        if(!latestStart || startMin > (parseInt(latestStart.split(':')[0])*60+parseInt(latestStart.split(':')[1]))) latestStart = entry.work_start;
+      }
       if(entry) otMin += (+entry.ot_min||0);
     }
     const salary = parseFloat(emp.salary)||0;
