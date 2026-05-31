@@ -992,7 +992,7 @@ async function renderReport(){
 
   // Build rows
   const rows = [];
-  let sumWorkMin = 0, sumOtMin = 0, daysCame = 0, daysOff = 0, daysOtSpecial = 0;
+  let sumWorkMin = 0, sumOtMin = 0, daysCame = 0, daysOff = 0, daysOtSpecial = 0, sumAdvances = 0, advCount = 0;
   for(let d=new Date(fromD); d<=toD; d.setDate(d.getDate()+1)){
     const mk = dateKey(d);
     const day = d.getDate();
@@ -1024,12 +1024,18 @@ async function renderReport(){
     else if(sched==='REQ_OFF') statusNote='ลา';
     else if(sched==='HALF') statusNote='½';
     const hasEntry = !!(entry.work_start || periods.length>0);
-    rows.push({date:new Date(d), day, mk, monthInfo, sched, isOffDay, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||'', hasEntry});
+    // Advances on this day for this employee
+    const isoDay = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const dayAdvances = (empInMonth?.advances||[]).filter(a=>a.date===isoDay);
+    const dayAdvAmount = dayAdvances.reduce((s,a)=>s+(parseFloat(a.amount)||0),0);
+    rows.push({date:new Date(d), day, mk, monthInfo, sched, isOffDay, entry, startEnd, firstIn, lastOut, workMin, otMin, statusNote, periods, note: entry.note||'', hasEntry, dayAdvances, dayAdvAmount});
     if(hasEntry && !isOffDay){ daysCame++; sumWorkMin += workMin; }
     if(hasEntry) sumOtMin += otMin;
     if(isOffDay) daysOff++;
     if(hasEntry && isOffDay) daysOtSpecial++;
+    if(dayAdvAmount > 0){ sumAdvances += dayAdvAmount; advCount += dayAdvances.length; }
   }
+  function fmtMoney(n){ return Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:2}); }
 
   const fromLabel = fromD.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
   const toLabel = toD.toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'});
@@ -1106,6 +1112,12 @@ async function renderReport(){
     } else {
       noteCell = esc(r.note) || '';
     }
+    // Append advance notice if any on this day
+    if(r.dayAdvAmount > 0){
+      const reasons = r.dayAdvances.filter(a=>a.note).map(a=>esc(a.note)).join(', ');
+      const advTag = `<span style="color:#c62828;font-weight:700;">💸 เบิก ${fmtMoney(r.dayAdvAmount)} บาท${r.dayAdvances.length>1?` (${r.dayAdvances.length}×)`:''}${reasons?` · ${reasons}`:''}</span>`;
+      noteCell = noteCell ? noteCell + ' · ' + advTag : advTag;
+    }
 
     card += `<tr class="${rowCls}" style="${rowStyle}" onclick="editReportRow('${esc(emp.name).replace(/'/g,"\\'")}','${r.mk}',${r.day})">
       <td class="date-cell">${dateLabel}</td>
@@ -1131,6 +1143,7 @@ async function renderReport(){
       <div><span>วันทำงาน</span><strong>${daysCame}</strong></div>
       <div><span>วันหยุด</span><strong>${daysOff}</strong></div>
       <div><span>OT รวม</span><strong>${fmtHours(sumOtMin)} ชม.</strong></div>
+      ${sumAdvances>0?`<div style="background:#ffebee;border-radius:6px;padding:6px 8px;"><span style="color:#c62828;">💸 เบิกล่วงหน้า</span><strong style="color:#c62828;">${fmtMoney(sumAdvances)} บาท</strong><div style="font-size:9px;color:#c62828;">(${advCount} ครั้ง)</div></div>`:''}
       <div style="text-align:center;">
         <span style="color:#666;">ลายเซ็น</span>
         <div style="margin-top:18px;border-bottom:1.5px solid #333;height:1px;width:80%;margin-left:auto;margin-right:auto;"></div>

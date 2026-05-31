@@ -1361,6 +1361,15 @@ async function renderReportTab(){
       else if(sched==='REQ_OFF') note = 'ลา';
       else if(isHalf) note = '½ ครึ่งวัน';
       if(entry.note) note = (note?note+' · ':'') + entry.note;
+      // Append advance info if any on this day
+      const isoDay = `${yy}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const dayAdvances = (emp.advances||[]).filter(a=>a.date===isoDay);
+      const dayAdvAmount = dayAdvances.reduce((s,a)=>s+(parseFloat(a.amount)||0),0);
+      if(dayAdvAmount > 0){
+        const reasons = dayAdvances.filter(a=>a.note).map(a=>esc(a.note)).join(', ');
+        const advTag = `<<<ADV>>>💸 เบิก ${fmt$(dayAdvAmount)} บาท${dayAdvances.length>1?` (${dayAdvances.length}×)`:''}${reasons?` · ${reasons}`:''}<<<ENDADV>>>`;
+        note = note ? note + ' · ' + advTag : advTag;
+      }
 
       if(isOffDay) countOff++;
       if(hasEntry && !isOffDay) countWork++;
@@ -1384,6 +1393,7 @@ async function renderReportTab(){
       else if(noteCell.startsWith('OFF')) noteCell = noteCell.replace('OFF','<span style="color:#c0392b;font-weight:700;">OFF</span>');
       else if(noteCell.startsWith('ลา')) noteCell = noteCell.replace('ลา','<span style="color:#7c2d12;font-weight:700;">ลา</span>');
       else if(noteCell.startsWith('½')) noteCell = noteCell.replace('½ ครึ่งวัน','<span style="color:#d97706;font-weight:700;">½ ครึ่งวัน</span>');
+      noteCell = noteCell.replace(/<<<ADV>>>/g,'<span style="color:#c62828;font-weight:700;">').replace(/<<<ENDADV>>>/g,'</span>');
 
       tableRows += `<tr style="${rowStyle}">
         <td style="padding:3px 3px;border:1px solid #e0e0e0;text-align:center;font-weight:700;color:#666;">${idx+1}</td>
