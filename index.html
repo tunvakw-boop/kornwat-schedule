@@ -195,6 +195,8 @@ body.exporting .tbl-frame{overflow:visible!important;display:inline-block!import
 body.exporting .nc,
 body.exporting .nc-body{position:static!important;}
 body.exporting #sched-tbl{width:auto!important;}
+/* Hide UI-only elements when exporting payroll/report */
+body.exporting .no-export{display:none!important;}
 </style>
 </head>
 <body>
@@ -1581,19 +1583,20 @@ async function renderPayroll(){
       </div>
     </div>
 
-    <table id="payroll-tbl" style="width:100%;border-collapse:collapse;font-size:12px;">
+    <table id="payroll-tbl" style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead>
-        <tr style="background:#fef9c4;color:#5d4037;">
-          <th style="width:30px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">No.</th>
-          <th style="padding:8px 6px;border:1px solid #c4a484;text-align:left;">ชื่อ</th>
-          <th style="width:60px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">วันทำงาน</th>
-          <th style="width:50px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">วันหยุด</th>
-          <th style="width:85px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">เงินเดือน</th>
-          <th style="width:55px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">OT (ชม.)</th>
-          <th style="width:70px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">OT (บาท)</th>
-          <th style="width:80px;padding:8px 4px;border:1px solid #c4a484;text-align:center;background:#ffebee;">เบิก</th>
-          <th style="width:85px;padding:8px 4px;border:1px solid #c4a484;text-align:center;background:#fef0e0;">สุทธิ</th>
-          <th style="width:60px;padding:8px 4px;border:1px solid #c4a484;text-align:center;">การกระทำ</th>
+        <tr style="background:#dbeafe;color:#1e3a5f;">
+          <th style="width:34px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">No.</th>
+          <th style="padding:8px 6px;border:1.5px solid #4a5568;text-align:left;">ชื่อ</th>
+          <th style="width:60px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">วันทำงาน</th>
+          <th style="width:50px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">วันหยุด</th>
+          <th style="width:85px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">เงินเดือน</th>
+          <th style="width:55px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">OT (ชม.)</th>
+          <th style="width:75px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">OT (บาท)</th>
+          <th style="width:80px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;background:#fee2e2;">เบิก</th>
+          <th style="width:85px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;background:#fef0e0;">สุทธิ</th>
+          <th style="width:85px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;background:#e8f5e9;">รวม</th>
+          <th class="no-export" style="width:60px;padding:8px 4px;border:1.5px solid #4a5568;text-align:center;">การกระทำ</th>
         </tr>
       </thead>
       <tbody>`;
@@ -1601,20 +1604,22 @@ async function renderPayroll(){
     const e = r.emp;
     const typeLbl = TYPE_LBL[e.type]||'';
     const unitLbl = r.su==='month' ? `(เดือน)` : `(${fmt$(r.salary)}/วัน)`;
+    const grossPay = r.basePay + r.otPay;
     html += `<tr>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#888;font-size:11px;">${i+1}</td>
-      <td style="padding:6px 8px;border:1px solid #e0e0e0;">
-        <div style="font-weight:700;color:#c44a1f;font-size:13px;">${esc(e.name)}</div>
-        <div style="font-size:10px;color:#666;">${typeLbl}${e.position?` · ${esc(e.position)}`:''} ${unitLbl}</div>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#000;font-weight:700;font-size:12px;">${i+1}</td>
+      <td style="padding:7px 8px;border:1.5px solid #888;">
+        <div style="font-weight:700;color:#000;font-size:14px;">${esc(e.name)}</div>
+        <div style="font-size:11px;color:#555;">${typeLbl}${e.position?` · ${esc(e.position)}`:''} ${unitLbl}</div>
       </td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#1565c0;font-weight:700;">${r.daysWorked}</td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)}</td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#d97706;font-weight:600;">${fmtNum(r.otHours)}</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#d97706;font-weight:700;">${fmt$(r.otPay)}</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#c62828;font-weight:700;background:${r.advanceTotal?'#ffebee':'#fff'};cursor:pointer;" onclick="showAdvancesModal('${esc(r.emp.name).replace(/'/g,"\\'")}')" title="แตะเพื่อจัดการเบิกล่วงหน้า">${r.advanceTotal?fmt$(r.advanceTotal)+`<br><span style="font-size:9px;color:#c62828;font-weight:400;">(${r.advanceCount} ครั้ง)</span>`:`<span style="color:#bbb;font-weight:400;">+ เบิก</span>`}</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#c44a1f;font-weight:800;background:#fef9e7;">${fmt$(r.total)}</td>
-      <td style="padding:4px;border:1px solid #e0e0e0;text-align:center;">
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#1565c0;font-weight:700;">${r.daysWorked}</td>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#c0392b;font-weight:600;">${r.daysOff}</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#2e7d32;font-weight:700;">${fmt$(r.basePay)}</td>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#000;font-weight:700;">${fmtNum(r.otHours)}</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#000;font-weight:700;">${fmt$(r.otPay)}</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#c62828;font-weight:700;background:${r.advanceTotal?'#fee2e2':'#fff'};cursor:pointer;" onclick="showAdvancesModal('${esc(r.emp.name).replace(/'/g,"\\'")}')" title="แตะเพื่อจัดการเบิกล่วงหน้า">${r.advanceTotal?fmt$(r.advanceTotal)+`<br><span style="font-size:10px;color:#c62828;font-weight:400;">(${r.advanceCount} ครั้ง)</span>`:`<span style="color:#bbb;font-weight:400;">+ เบิก</span>`}</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#000;font-weight:800;background:#fef9e7;">${fmt$(r.total)}</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#000;font-weight:800;background:#e8f5e9;">${fmt$(grossPay)}</td>
+      <td class="no-export" style="padding:4px;border:1.5px solid #888;text-align:center;">
         <div style="display:flex;gap:3px;justify-content:center;">
           <button class="btn-sm btn-edit" title="ดู/แก้รายวัน" onclick="showEmpDailyDetail('${esc(r.emp.name).replace(/'/g,"\\'")}')" style="padding:3px 6px;">✏</button>
           <button class="btn-sm btn-edit" title="สลิป" onclick="exportPayslip(${i})" style="padding:3px 6px;">📄</button>
@@ -1629,20 +1634,21 @@ async function renderPayroll(){
     const no = rows.length + ei + 1;
     const amt = parseFloat(exp.amount)||0;
     expTotal += amt;
-    html += `<tr style="background:#fff9c4;">
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#888;font-size:11px;">${no}</td>
-      <td style="padding:6px 8px;border:1px solid #e0e0e0;">
-        <div style="font-weight:700;color:#7a5d20;font-size:13px;">${esc(exp.name||'(ไม่มีชื่อ)')}</div>
-        <div style="font-size:10px;color:#888;">💰 ค่าใช้จ่ายประจำ${exp.note?` · ${esc(exp.note)}`:''}</div>
+    html += `<tr style="background:#e3f2fd;">
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#000;font-weight:700;font-size:12px;">${no}</td>
+      <td style="padding:7px 8px;border:1.5px solid #888;">
+        <div style="font-weight:700;color:#000;font-size:14px;">${esc(exp.name||'(ไม่มีชื่อ)')}</div>
+        <div style="font-size:11px;color:#1e3a5f;">💰 ค่าใช้จ่ายประจำ${exp.note?` · ${esc(exp.note)}`:''}</div>
       </td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#bbb;">—</td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#bbb;">—</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#7a5d20;font-weight:700;">${fmt$(amt)}</td>
-      <td style="padding:6px 4px;border:1px solid #e0e0e0;text-align:center;color:#bbb;">—</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#bbb;">—</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#bbb;">—</td>
-      <td style="padding:6px 6px;border:1px solid #e0e0e0;text-align:right;color:#7a5d20;font-weight:800;background:#fef9c4;">${fmt$(amt)}</td>
-      <td style="padding:4px;border:1px solid #e0e0e0;text-align:center;">
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#bbb;">—</td>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#bbb;">—</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#1e3a5f;font-weight:700;">${fmt$(amt)}</td>
+      <td style="padding:7px 4px;border:1.5px solid #888;text-align:center;color:#bbb;">—</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#bbb;">—</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#bbb;">—</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#000;font-weight:800;background:#cfe2ff;">${fmt$(amt)}</td>
+      <td style="padding:7px 6px;border:1.5px solid #888;text-align:right;color:#000;font-weight:800;background:#cfe2ff;">${fmt$(amt)}</td>
+      <td class="no-export" style="padding:4px;border:1.5px solid #888;text-align:center;">
         <div style="display:flex;gap:3px;justify-content:center;">
           <button class="btn-sm btn-edit" onclick="editExpense(${ei})" style="padding:3px 6px;">✏</button>
           <button class="btn-sm btn-del" onclick="delExpense(${ei})" style="padding:3px 6px;">🗑</button>
@@ -1651,10 +1657,10 @@ async function renderPayroll(){
     </tr>`;
   });
 
-  // Add expense button row
-  html += `<tr>
-    <td colspan="10" style="padding:6px;border:1px solid #e0e0e0;background:#fffdf5;">
-      <button onclick="addExpense()" style="width:100%;padding:8px;background:#fef3e2;color:#c44a1f;border:1.5px dashed #e07b54;border-radius:6px;font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
+  // Add expense button row — hidden in exports
+  html += `<tr class="no-export">
+    <td colspan="11" style="padding:6px;border:1.5px solid #888;background:#fffdf5;">
+      <button onclick="addExpense()" style="width:100%;padding:8px;background:#fef3e2;color:#c44a1f;border:1.5px dashed #e07b54;border-radius:6px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">
         + เพิ่มค่าใช้จ่ายประจำ
       </button>
     </td>
@@ -1667,34 +1673,37 @@ async function renderPayroll(){
 
   html += `</tbody>
       <tfoot>
-        <tr style="background:#fef3e2;font-weight:800;color:#8b4513;">
-          <td colspan="2" style="padding:8px 6px;border:1px solid #c4a484;text-align:right;">รวมพนักงาน : ${totalEmps}</td>
-          <td style="padding:8px 4px;border:1px solid #c4a484;text-align:center;color:#1565c0;">${sumDays}</td>
-          <td style="padding:8px 4px;border:1px solid #c4a484;text-align:center;color:#c0392b;">${sumOff}</td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#2e7d32;">${fmt$(sumBase)}</td>
-          <td style="padding:8px 4px;border:1px solid #c4a484;text-align:center;color:#d97706;">${fmtNum(sumOtHr)}</td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#d97706;">${fmt$(sumOt)}</td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#c62828;background:#ffebee;">${sumAdv?'−'+fmt$(sumAdv):'—'}</td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;color:#c44a1f;background:#fef0e0;">${fmt$(sumTotal)}</td>
-          <td style="border:1px solid #c4a484;"></td>
+        <tr style="background:#fef3e2;font-weight:800;color:#000;">
+          <td colspan="2" style="padding:9px 6px;border:1.5px solid #555;text-align:right;font-size:13px;">รวมพนักงาน : ${totalEmps}</td>
+          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#1565c0;">${sumDays}</td>
+          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#c0392b;">${sumOff}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#2e7d32;">${fmt$(sumBase)}</td>
+          <td style="padding:9px 4px;border:1.5px solid #555;text-align:center;color:#000;">${fmtNum(sumOtHr)}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#000;">${fmt$(sumOt)}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#c62828;background:#fee2e2;">${sumAdv?'−'+fmt$(sumAdv):'—'}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#000;background:#fef0e0;">${fmt$(sumTotal)}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;color:#000;background:#e8f5e9;">${fmt$(sumBase+sumOt)}</td>
+          <td class="no-export" style="border:1.5px solid #555;"></td>
         </tr>
-        ${expenses.length>0?`<tr style="background:#fff3c4;font-weight:800;color:#7a5d20;">
-          <td colspan="4" style="padding:8px 6px;border:1px solid #c4a484;text-align:right;">รวมค่าใช้จ่าย : ${expenses.length}</td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;">${fmt$(expTotal)}</td>
-          <td style="padding:8px 4px;border:1px solid #c4a484;"></td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;"></td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;"></td>
-          <td style="padding:8px 6px;border:1px solid #c4a484;text-align:right;background:#fef9c4;">${fmt$(expTotal)}</td>
-          <td style="border:1px solid #c4a484;"></td>
+        ${expenses.length>0?`<tr style="background:#dbeafe;font-weight:800;color:#1e3a5f;">
+          <td colspan="4" style="padding:9px 6px;border:1.5px solid #555;text-align:right;font-size:13px;">รวมค่าใช้จ่ายประจำ : ${expenses.length}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;">${fmt$(expTotal)}</td>
+          <td style="padding:9px 4px;border:1.5px solid #555;"></td>
+          <td style="padding:9px 6px;border:1.5px solid #555;"></td>
+          <td style="padding:9px 6px;border:1.5px solid #555;"></td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;background:#cfe2ff;">${fmt$(expTotal)}</td>
+          <td style="padding:9px 6px;border:1.5px solid #555;text-align:right;background:#cfe2ff;">${fmt$(expTotal)}</td>
+          <td class="no-export" style="border:1.5px solid #555;"></td>
         </tr>`:''}
-        <tr style="background:#c44a1f;color:#fff;font-weight:800;font-size:13px;">
-          <td colspan="8" style="padding:10px 6px;border:1px solid #c4a484;text-align:right;">รวมทั้งสิ้น (${totalItems} รายการ${sumAdv?` · หักเบิกแล้ว ${fmt$(sumAdv)}`:''})</td>
-          <td style="padding:10px 6px;border:1px solid #c4a484;text-align:right;font-size:14px;">${fmt$(grandTotal)}</td>
-          <td style="border:1px solid #c4a484;"></td>
+        <tr style="background:#c44a1f;color:#fff;font-weight:800;font-size:14px;">
+          <td colspan="8" style="padding:11px 6px;border:1.5px solid #333;text-align:right;">รวมทั้งสิ้น (${totalItems} รายการ${sumAdv?` · หักเบิกแล้ว ${fmt$(sumAdv)}`:''})</td>
+          <td style="padding:11px 6px;border:1.5px solid #333;text-align:right;font-size:15px;">${fmt$(grandTotal)}</td>
+          <td style="padding:11px 6px;border:1.5px solid #333;text-align:right;font-size:15px;background:#a83a17;">${fmt$(sumBase+sumOt+expTotal)}</td>
+          <td class="no-export" style="border:1.5px solid #333;"></td>
         </tr>
       </tfoot>
     </table>
-    <p style="text-align:center;font-size:10px;color:#aaa;margin-top:10px;">⏱ ข้อมูลล่าสุด: ${new Date().toLocaleTimeString('th-TH')}</p>
+    <p class="no-export" style="text-align:center;font-size:10px;color:#aaa;margin-top:10px;">⏱ ข้อมูลล่าสุด: ${new Date().toLocaleTimeString('th-TH')}</p>
   </div>`;
 
   // Action buttons (outside the report card so they don't appear in export)
@@ -1893,12 +1902,18 @@ function delAdvance(empName, idx){
   showToast('ลบแล้ว');
 }
 
-// Export full payroll card as PNG/PDF (includes header + table + footer)
+// Export full payroll card as PNG/PDF — hides .no-export elements during capture
 async function exportPayrollPNG(){
-  await exportNodeAsImage('payroll-card', `เงินเดือน-${(window._payrollMonth||{}).label||''}.png`);
+  document.body.classList.add('exporting');
+  await new Promise(r=>setTimeout(r,60));
+  try{ await exportNodeAsImage('payroll-card', `เงินเดือน-${(window._payrollMonth||{}).label||''}.png`); }
+  finally{ document.body.classList.remove('exporting'); }
 }
 async function exportPayrollPDF(){
-  await exportNodeAsPdf('payroll-card', `เงินเดือน-${(window._payrollMonth||{}).label||''}.pdf`);
+  document.body.classList.add('exporting');
+  await new Promise(r=>setTimeout(r,60));
+  try{ await exportNodeAsPdf('payroll-card', `เงินเดือน-${(window._payrollMonth||{}).label||''}.pdf`); }
+  finally{ document.body.classList.remove('exporting'); }
 }
 async function exportPayslip(rowIdx){
   const r = (window._payrollRows||[])[rowIdx]; if(!r) return;
