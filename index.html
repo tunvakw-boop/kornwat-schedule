@@ -1718,7 +1718,7 @@ async function renderPayroll(){
   html += `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
     <button class="btn-sec" onclick="refreshPayroll()" style="flex:0 0 auto;padding:8px 14px;">🔄 โหลดล่าสุด</button>
     <button class="btn-pri" onclick="exportPayrollPNG()" style="flex:1;min-width:120px;">📷 บันทึกรูป</button>
-    <button class="btn-pri" onclick="exportPayrollPDF()" style="flex:1;min-width:120px;">📄 บันทึก PDF</button>
+    <button class="btn-pri" onclick="exportPayrollPDF()" style="flex:1;min-width:120px;">📄 บันทึก PDF (A3 แนวนอน)</button>
   </div>`;
 
   // Notes
@@ -1917,10 +1917,29 @@ async function exportPayrollPNG(){
   try{ await exportNodeAsImage('payroll-card', `เงินเดือน-${(window._payrollMonth||{}).label||''}.png`); }
   finally{ document.body.classList.remove('exporting'); }
 }
+// Payroll uses A3 landscape — wider table needs more room than A4 to keep text readable
 async function exportPayrollPDF(){
   document.body.classList.add('exporting');
   await new Promise(r=>setTimeout(r,60));
-  try{ await exportNodeAsPdf('payroll-card', `เงินเดือน-${(window._payrollMonth||{}).label||''}.pdf`); }
+  try{
+    const node = document.getElementById('payroll-card'); if(!node) return;
+    if(!window.jspdf){ showToast('⚠ jspdf ไม่พร้อม'); return; }
+    showToast('⏳ กำลังสร้าง PDF (A3 แนวนอน)...');
+    const canvas = await html2canvas(node, {backgroundColor:'#fff', scale:2, useCORS:true, allowTaint:true, logging:false});
+    const {jsPDF} = window.jspdf;
+    const pdf = new jsPDF({orientation:'landscape', unit:'pt', format:'a3'});  // 1191 × 842 pt
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 18;
+    const usableW = pageW - margin*2;
+    const usableH = pageH - margin*2;
+    const cw = canvas.width, ch = canvas.height;
+    const scale = Math.min(usableW/cw, usableH/ch);
+    const drawW = cw*scale, drawH = ch*scale;
+    pdf.addImage(canvas.toDataURL('image/png'),'PNG', (pageW-drawW)/2, (pageH-drawH)/2, drawW, drawH);
+    pdf.save(`เงินเดือน-${(window._payrollMonth||{}).label||''}.pdf`);
+    showToast('📄 บันทึก PDF แล้ว (A3 แนวนอน)');
+  }catch(e){ console.error(e); showToast('⚠ '+(e.message||'').slice(0,80)); }
   finally{ document.body.classList.remove('exporting'); }
 }
 async function exportPayslip(rowIdx){
