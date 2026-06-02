@@ -604,6 +604,9 @@ function addHoursToTime(timeStr, hours){
   return `${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`;
 }
 
+// Convert "HH:MM" to Thai dot format "HH.MM"
+function dotTime(t){ return t ? t.replace(':','.') : ''; }
+
 // Set time-picker selects to a HH:MM value, snapping minutes to available options
 function setTimePickerValue(idPrefix, timeStr){
   const [hh, mm] = timeStr.split(':');
@@ -1017,8 +1020,8 @@ async function renderReport(){
     }
     const otMin = +entry.ot_min || 0;
     const startEnd = isOffDay
-      ? (periods.length ? 'OT พิเศษ' : '')
-      : (entry.work_start ? `${entry.work_start}-${addHours(entry.work_start, 8)}` : '');
+      ? ''
+      : (entry.work_start ? `เข้า ${dotTime(entry.work_start)}<br>เลิก ${dotTime(addHours(entry.work_start, 9))}` : '');
     let statusNote = '';
     if(sched==='OFF') statusNote='OFF';
     else if(sched==='REQ_OFF') statusNote='ลา';
@@ -1090,9 +1093,10 @@ async function renderReport(){
     else if(r.hasEntry){ rowCls = 'has-entry'; }
 
     // (3) Schedule time column: always show OFF/ลา for off days (no "OT พิเศษ" here)
+    //     For working days: 2-line "เข้า/เลิก" with Thai dot format, end = start + 9h
     const startEndCell = r.isOffDay
       ? (r.statusNote==='OFF'?'<span style="color:#c0392b;font-weight:700;">OFF</span>':'<span style="color:#7c2d12;font-weight:700;">ลา</span>')
-      : (esc(r.startEnd) || '—');
+      : (r.startEnd || '—');
 
     // (4) Out column: if multiple periods, show "out1, in2-out2, in3-out3, ..."
     let outCell = '—';

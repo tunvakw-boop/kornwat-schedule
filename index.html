@@ -1203,6 +1203,9 @@ function addHoursToTimeStr(timeStr, hours){
   return `${String(Math.floor(wrapped/60)).padStart(2,'0')}:${String(wrapped%60).padStart(2,'0')}`;
 }
 
+// Convert "HH:MM" to Thai dot format "HH.MM"
+function dotTimeMain(t){ return t ? t.replace(':','.') : ''; }
+
 // Compute OT/work time from periods (mirrors clock.html computeOtFromPeriods)
 function computeOtFromPeriodsMain(periods, isOffDay){
   let rawMin = 0;
@@ -1340,7 +1343,7 @@ async function renderReportTab(){
       const periods = entry.periods || [];
       const hasEntry = !!(entry.work_start || periods.length>0);
 
-      const schedTime = entry.work_start ? `${entry.work_start}-${addHoursToTimeStr(entry.work_start, 8)}` : '';
+      const schedTime = entry.work_start ? `เข้า ${dotTimeMain(entry.work_start)}<br>เลิก ${dotTimeMain(addHoursToTimeStr(entry.work_start, 9))}` : '';
       let actIn='', actOut='';
       if(periods.length){
         actIn = periods[0].in || '';
@@ -1388,6 +1391,7 @@ async function renderReportTab(){
           ? '<span style="color:#7c2d12;font-weight:700;">ลา</span>'
           : '<span style="color:#c0392b;font-weight:700;">OFF</span>';
       } else {
+        // schedTime contains HTML (เข้า / เลิก 2-line format), do not escape
         schedCell = schedTime || '—';
       }
       let noteCell = note;
