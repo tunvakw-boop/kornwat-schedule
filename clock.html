@@ -1021,7 +1021,7 @@ async function renderReport(){
     const otMin = +entry.ot_min || 0;
     const startEnd = isOffDay
       ? ''
-      : (entry.work_start ? `เข้า ${dotTime(entry.work_start)}<br>เลิก ${dotTime(addHours(entry.work_start, 9))}` : '');
+      : (entry.work_start ? `${dotTime(entry.work_start)}-${dotTime(addHours(entry.work_start, 9))}` : '');
     let statusNote = '';
     if(sched==='OFF') statusNote='OFF';
     else if(sched==='REQ_OFF') statusNote='ลา';

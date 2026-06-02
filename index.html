@@ -1343,7 +1343,7 @@ async function renderReportTab(){
       const periods = entry.periods || [];
       const hasEntry = !!(entry.work_start || periods.length>0);
 
-      const schedTime = entry.work_start ? `เข้า ${dotTimeMain(entry.work_start)}<br>เลิก ${dotTimeMain(addHoursToTimeStr(entry.work_start, 9))}` : '';
+      const schedTime = entry.work_start ? `${dotTimeMain(entry.work_start)}-${dotTimeMain(addHoursToTimeStr(entry.work_start, 9))}` : '';
       let actIn='', actOut='';
       if(periods.length){
         actIn = periods[0].in || '';
