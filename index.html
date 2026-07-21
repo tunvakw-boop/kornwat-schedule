@@ -590,6 +590,24 @@ function countWeekdayInMonth(year, month, weekday){
   return count;
 }
 
+// From this month onward, a regular employee's carryover (phCarry / "ยอดยกมา")
+// is derived LIVE from the previous month's remaining (phRemain), instead of a
+// frozen snapshot taken at month-creation time. Earlier months keep their stored
+// values untouched. Chain terminates at the first month before the threshold.
+const DYNAMIC_CARRY_FROM = '2026-08';
+function monthKeyOf(m){ return `${m.year}-${String(m.month).padStart(2,'0')}`; }
+function effectivePhCarry(emp, m){
+  const key = monthKeyOf(m);
+  if(key < DYNAMIC_CARRY_FROM) return parseFloat(emp.phCarry||0)||0;
+  const ks = sorted();
+  const idx = ks.indexOf(key);
+  if(idx <= 0) return parseFloat(emp.phCarry||0)||0;
+  const prevM = data[ks[idx-1]];
+  const prevEmp = (prevM.employees||[]).find(x=>x.name && x.name===emp.name);
+  if(!prevEmp || prevEmp.type!=='regular') return parseFloat(emp.phCarry||0)||0;
+  return parseFloat(deriveEmpStats(prevEmp, prevM).phRemain)||0;
+}
+
 // Derive employee stats. Regulars: auto-calc. Others: use stored values.
 function deriveEmpStats(emp, m){
   let off=0, half=0, reqOff=0, wk=0;
@@ -605,7 +623,7 @@ function deriveEmpStats(emp, m){
 
   if(emp.type==='regular'){
     const holidaysAdded = parseFloat(m.holidaysAdded||0)||0;
-    const phCarry = parseFloat(emp.phCarry||0)||0;
+    const phCarry = effectivePhCarry(emp, m);
     const phTotal = phCarry + holidaysAdded;
     const vacUsed = Math.max(0, actualOff - tueCount);
     const phRemain = phTotal - vacUsed;
@@ -996,6 +1014,19 @@ function editPhCarry(ei){
   const emp=data[curKey].employees[ei]; if(!emp) return;
   const m = data[curKey];
   const holidaysAdded = parseFloat(m.holidaysAdded||0)||0;
+  // ส.ค.69 เป็นต้นไป: ยอดยกมาดึงจากคงเหลือเดือนก่อนอัตโนมัติ — แก้มือไม่ได้
+  if(monthKeyOf(m) >= DYNAMIC_CARRY_FROM){
+    const carry = effectivePhCarry(emp, m);
+    openModal('ที่มี (วันหยุด) — '+emp.name,
+      `<p style="font-size:13px;color:#444;line-height:1.7;">
+         ยอดยกมาเดือนนี้ = <strong>${fmtNum(carry)}</strong> วัน<br>
+         ดึงจาก <strong>คงเหลือของเดือนก่อนอัตโนมัติ</strong> (แก้ที่นี่ไม่ได้)<br>
+         ที่มีรวม = ${fmtNum(carry)} + ${fmtNum(holidaysAdded)} (วันหยุดเพิ่มเดือนนี้) = <strong>${fmtNum(carry+holidaysAdded)}</strong>
+       </p>
+       <p style="font-size:11px;color:#666;margin-top:8px;">ต้องการปรับ ให้ไปแก้ที่เดือนก่อนหน้า แล้วยอดจะไหลตามมาเอง</p>`,
+      `<button class="btn-pri" onclick="closeModal()">เข้าใจแล้ว</button>`);
+    return;
+  }
   const phCarry = parseFloat(emp.phCarry||0)||0;
   openModal('ที่มี (วันหยุด) — '+emp.name,
     `<div class="fg"><label>Carryover จากเดือนก่อน (วัน)</label>
@@ -1168,6 +1199,8 @@ function addNextMonth(){
       phCarry = parseFloat(prevStats.phRemain)||0;
     }
     return {no:e.no||'',name:e.name,position:e.position||'',type:e.type,schedule:s,
+            salary:(e.salary!==undefined?e.salary:''),
+            salaryUnit:(e.salaryUnit||(e.type==='regular'?'month':'day')),
             phCarry, vacUsed:'', phTotal:'', phRemain:'', remark:''};
   });
 
