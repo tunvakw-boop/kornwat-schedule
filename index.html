@@ -626,9 +626,13 @@ function deriveEmpStats(emp, m){
     const phCarry = effectivePhCarry(emp, m);
     const phTotal = phCarry + holidaysAdded;
     const vacUsed = Math.max(0, actualOff - tueCount);
-    const phRemain = phTotal - vacUsed;
+    const autoRemain = phTotal - vacUsed;
+    // Manual override of คงเหลือ (e.g. sick days already compensated by half-salary).
+    // When set, it wins AND flows forward to next month via effectivePhCarry.
+    const hasOverride = emp.phRemainOverride!==undefined && emp.phRemainOverride!==null && emp.phRemainOverride!=='';
+    const phRemain = hasOverride ? (parseFloat(emp.phRemainOverride)||0) : autoRemain;
     return {wk, off, half, reqOff, actualOff, tueCount, holidaysAdded, phCarry,
-            phTotal, phRemain, vacUsed, auto:true};
+            phTotal, phRemain, autoRemain, remainOverridden:hasOverride, vacUsed, auto:true};
   }
   // Non-regular: keep stored values
   return {wk, off, half, reqOff, actualOff, tueCount,
@@ -795,6 +799,9 @@ function renderSchedule(){
     const vacUsedDisp = st.auto ? fmtNum(st.vacUsed) : (st.vacUsed||'');
     const phEditHandler = st.auto ? `editPhCarry(${ei})` : `editPhTotal(${ei})`;
     const vacEditHandler = st.auto ? `showAutoCalcInfo(${ei})` : `editVacUsed(${ei})`;
+    const phrHandler = st.auto ? `onclick="editPhRemain(${ei})"` : '';
+    const phrStyle = st.auto ? (st.remainOverridden ? ' style="cursor:pointer;background:#fce7f3;color:#a21caf;font-weight:800;"' : ' style="cursor:pointer;"') : '';
+    const phrMark = (st.auto && st.remainOverridden) ? ' ✎' : '';
     body+=`<tr class="emp-row" data-ei="${ei}">
       <td class="nc-body emp-no-cell" style="min-width:30px;max-width:30px;">${autoNo}</td>
       <td class="nc-body" style="min-width:108px;max-width:108px;" onclick="editEmpName(${ei})">
@@ -806,7 +813,7 @@ function renderSchedule(){
       <td class="sc of" id="of-${ei}">${fmtNum(st.actualOff)}</td>
       <td class="sc vc" id="vc-${ei}" onclick="${vacEditHandler}" title="${st.auto?'คำนวณอัตโนมัติ — แตะเพื่อดูรายละเอียด':'แตะเพื่อแก้ไข'}">${vacUsedDisp||'<span style="color:#ccc;">—</span>'}</td>
       <td class="sc ph" id="pht-${ei}" onclick="${phEditHandler}" title="${st.auto?'แตะเพื่อแก้ไข ที่มี (carryover)':'แตะเพื่อแก้ไข'}">${phTotalDisp||'<span style="color:#ccc;">—</span>'}</td>
-      <td class="sc ph" id="phr-${ei}">${phRemainDisp||'<span style="color:#ccc;">—</span>'}</td>
+      <td class="sc ph" id="phr-${ei}" ${phrHandler}${phrStyle} title="${st.auto?'แตะเพื่อแก้คงเหลือเอง':''}">${phRemainDisp||'<span style="color:#ccc;">—</span>'}${phrMark}</td>
       <td class="rc" onclick="editRemark(${ei})" title="แตะเพื่อแก้ไข">${esc(emp.remark||'')||'<span style="color:#ccc;">—</span>'}</td>
     </tr>`;
   });
@@ -1042,6 +1049,38 @@ function savePhCarry(ei){
   const v = document.getElementById('pc-inp').value;
   data[curKey].employees[ei].phCarry = Math.max(0, parseFloat(v)||0);
   saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+
+// ── PhRemain override editor (คงเหลือ แก้มือ — ยังไหลต่อเดือนถัดไป) ──
+function editPhRemain(ei){
+  if(locked){ showToast('🔒 ปลดล็อกก่อน'); return; }
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  const m=data[curKey];
+  const st=deriveEmpStats(emp,m);
+  if(!st.auto) return; // override เฉพาะพนักงานประจำ (auto-calc)
+  const hasOvr = emp.phRemainOverride!==undefined && emp.phRemainOverride!==null && emp.phRemainOverride!=='';
+  openModal('คงเหลือ (วันหยุด) — '+emp.name,
+    `<p style="font-size:12px;color:#555;line-height:1.6;">
+       ค่าคำนวณอัตโนมัติ = ที่มี ${fmtNum(st.phTotal)} − ใช้ ${fmtNum(st.vacUsed)} = <strong>${fmtNum(st.autoRemain)}</strong> วัน
+     </p>
+     <div class="fg"><label>กำหนดคงเหลือเอง (วัน)</label>
+       <input type="number" id="pr-inp" value="${hasOvr?emp.phRemainOverride:''}" step="0.5" placeholder="${fmtNum(st.autoRemain)}"></div>
+     <p style="font-size:11px;color:#666;margin-top:-4px;">ใส่ตัวเลขเพื่อแก้เอง (เช่น จ่ายชดเชยแล้ว ไม่คิดวันป่วย) — ค่านี้จะไหลไปเป็น <strong>ยอดยกมาเดือนถัดไป</strong> ด้วย · เว้นว่าง = กลับไปคำนวณอัตโนมัติ</p>`,
+    `<button class="btn-sec" onclick="resetPhRemain(${ei})">↺ กลับเป็นอัตโนมัติ</button>
+     <button class="btn-pri" onclick="savePhRemain(${ei})">บันทึก</button>`);
+  setTimeout(()=>{const el=document.getElementById('pr-inp'); if(el) el.focus();},100);
+}
+function savePhRemain(ei){
+  const v=document.getElementById('pr-inp').value;
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  if(v===''){ delete emp.phRemainOverride; }
+  else { emp.phRemainOverride = parseFloat(v)||0; }
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+}
+function resetPhRemain(ei){
+  const emp=data[curKey].employees[ei]; if(!emp) return;
+  delete emp.phRemainOverride;
+  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('กลับเป็นคำนวณอัตโนมัติแล้ว');
 }
 
 // ── Time-entry editor (for owner — main app) ──
