@@ -1303,6 +1303,21 @@ function computeOtFromPeriodsMain(periods, isOffDay){
   return {totalMin, otMin:Math.max(0,totalMin-480), rawMin};
 }
 
+// Effective OT minutes for an entry, consistent with the CURRENT schedule state.
+// Entries that have recorded clock-in periods are re-derived against today's
+// schedule, so a day switched OFF→work no longer double-counts the shift as
+// special OT (old bug: ot_min was frozen at record-time as full-shift OT).
+// Manual entries (work_start only, no periods) keep their stored ot_min.
+function effectiveOtMin(entry, sched){
+  if(!entry) return 0;
+  const periods = entry.periods||[];
+  if(periods.length){
+    const isOff = (sched==='OFF' || sched==='REQ_OFF');
+    return computeOtFromPeriodsMain(periods, isOff).otMin;
+  }
+  return (+entry.ot_min||0);
+}
+
 async function renderReportTab(){
   if(!_reportFrom) _reportFrom = isoToday();
   if(!_reportTo) _reportTo = _reportFrom;
@@ -1431,7 +1446,7 @@ async function renderReportTab(){
       } else if(entry.work_start){
         actIn = entry.work_start;
       }
-      const otMin = +entry.ot_min || 0;
+      const otMin = effectiveOtMin(entry, sched);
       let note = '';
       if(isOffDay && hasEntry) note = '🌙 OT พิเศษ';
       else if(sched==='OFF') note = 'OFF';
@@ -1631,7 +1646,7 @@ async function renderPayroll(){
       } else { // W
         if(has) daysWorked++;
       }
-      if(has) totalOtMin += +e.ot_min||0;
+      if(has) totalOtMin += effectiveOtMin(e, sched);
     }
     const salary = parseFloat(emp.salary)||0;
     const su = emp.salaryUnit || (emp.type==='regular'?'month':'day');
@@ -2077,12 +2092,13 @@ async function showEmpDailyDetail(empName){
     const e = entries[`${empName}|${d}`] || {};
     const isWorking = (s==='W' || s==='HALF');
     const wdLabel = DAY_TH[dow(m.year,m.month,d)];
+    const otM = effectiveOtMin(e, s);
     rows += `<tr style="border-bottom:1px solid #fde8d8;${!isWorking?'background:#fef0f5;color:#888;':''}">
       <td style="padding:6px 4px;text-align:center;font-weight:700;width:30px;">${d}</td>
       <td style="padding:6px 4px;font-size:10px;width:30px;">${wdLabel}</td>
       <td style="padding:6px 4px;width:60px;">${s==='OFF'?'<span style="color:#c0392b;">OFF</span>':s==='HALF'?'<span style="color:#d97706;">½</span>':s==='REQ_OFF'?'<span style="color:#7c2d12;">รีเควส</span>':'<span style="color:#2e7d32;">W</span>'}</td>
       <td style="padding:6px 4px;font-size:11px;">${e.work_start||'<span style="color:#ccc;">—</span>'}</td>
-      <td style="padding:6px 4px;font-size:11px;text-align:right;">${e.ot_min?fmtNum(e.ot_min/60)+' ชม.':'<span style="color:#ccc;">—</span>'}</td>
+      <td style="padding:6px 4px;font-size:11px;text-align:right;">${otM?fmtNum(otM/60)+' ชม.':'<span style="color:#ccc;">—</span>'}</td>
       <td style="padding:4px;text-align:center;">${isWorking?`<button class="btn-sm btn-edit" style="padding:3px 8px;font-size:11px;" onclick="editTimeEntry('${esc(empName)}',${d})">แก้</button>`:''}</td>
     </tr>`;
   }
@@ -2183,7 +2199,7 @@ async function renderSummary(){
         if(!earliestStart || startMin < (parseInt(earliestStart.split(':')[0])*60+parseInt(earliestStart.split(':')[1]))) earliestStart = entry.work_start;
         if(!latestStart || startMin > (parseInt(latestStart.split(':')[0])*60+parseInt(latestStart.split(':')[1]))) latestStart = entry.work_start;
       }
-      if(entry) otMin += (+entry.ot_min||0);
+      if(entry) otMin += effectiveOtMin(entry, sched);
     }
     const salary = parseFloat(emp.salary)||0;
     const su = emp.salaryUnit || (emp.type==='regular'?'month':'day');
