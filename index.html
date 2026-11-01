@@ -920,10 +920,23 @@ function onTypeChange(){
   const t = document.getElementById('en-type').value;
   document.getElementById('en-sunit').value = (t==='regular') ? 'month' : 'day';
 }
+// Apply an employee's salary forward to all LATER existing months (matched by name).
+// Past months stay untouched, so a raise set once carries forward without
+// rewriting history. Returns how many future months were updated.
+function propagateSalaryForward(name, fromKey, salary, salaryUnit){
+  let n=0;
+  Object.keys(data).forEach(k=>{
+    if(k<=fromKey) return;
+    const emp=(data[k].employees||[]).find(x=>x.name===name);
+    if(emp){ emp.salary=salary; emp.salaryUnit=salaryUnit; n++; }
+  });
+  return n;
+}
 function saveEmpName(ei){
   const name = document.getElementById('en-name').value.trim();
   if(!name){ alert('ใส่ชื่อก่อน'); return; }
   const e = data[curKey].employees[ei];
+  const origName = e.name; // future months still use the pre-rename name
   e.name = name;
   e.position = document.getElementById('en-pos').value.trim();
   e.no = document.getElementById('en-no').value.trim();
@@ -931,7 +944,9 @@ function saveEmpName(ei){
   const sv = document.getElementById('en-salary').value;
   e.salary = sv===''?'':String(Math.max(0, parseFloat(sv)||0));
   e.salaryUnit = document.getElementById('en-sunit').value;
-  saveLocal(); markDirty(); closeModal(); renderSchedule(); showToast('บันทึกแล้ว');
+  const nFwd = propagateSalaryForward(origName, curKey, e.salary, e.salaryUnit);
+  saveLocal(); markDirty(); closeModal(); renderSchedule();
+  showToast(nFwd ? `บันทึก + ส่งเงินเดือนไป ${nFwd} เดือนถัดไป` : 'บันทึกแล้ว');
 }
 
 let _grpEditState = {color:''};
@@ -1313,9 +1328,32 @@ function effectiveOtMin(entry, sched){
   const periods = entry.periods||[];
   if(periods.length){
     const isOff = (sched==='OFF' || sched==='REQ_OFF');
-    return computeOtFromPeriodsMain(periods, isOff).otMin;
+    let ot = computeOtFromPeriodsMain(periods, isOff).otMin;
+    // Leaving before the scheduled end eats into OT first (floored at 0).
+    ot -= earlyLeaveMin(entry, sched);
+    return Math.max(0, ot);
   }
   return (+entry.ot_min||0);
+}
+
+// Minutes left early: scheduled end (start + 9h shift) minus actual last clock-out,
+// on a normal work day only. 0 if they stayed past the scheduled end (that's OT),
+// on an off/leave day, or when there is no clock-in record.
+function earlyLeaveMin(entry, sched){
+  if(!entry) return 0;
+  if(sched==='OFF' || sched==='REQ_OFF') return 0;
+  const periods = entry.periods||[];
+  if(!periods.length) return 0;
+  const start = entry.work_start || periods[0].in;
+  const lastOut = periods[periods.length-1].out;
+  if(!start || !lastOut) return 0;
+  const toMin = t=>{ const [h,mm]=t.split(':').map(Number); return h*60+mm; };
+  const startMin = toMin(start);
+  const schedEnd = startMin + 540; // 8h work + 1h break = 9h scheduled shift
+  let out = toMin(lastOut);
+  if(out < startMin) out += 1440; // overnight
+  const early = schedEnd - out;
+  return early>0 ? early : 0;
 }
 
 async function renderReportTab(){
@@ -1447,11 +1485,13 @@ async function renderReportTab(){
         actIn = entry.work_start;
       }
       const otMin = effectiveOtMin(entry, sched);
+      const earlyMin = earlyLeaveMin(entry, sched);
       let note = '';
       if(isOffDay && hasEntry) note = '🌙 OT พิเศษ';
       else if(sched==='OFF') note = 'OFF';
       else if(sched==='REQ_OFF') note = 'ลา';
       else if(isHalf) note = '½ ครึ่งวัน';
+      if(earlyMin>0) note = (note?note+' · ':'') + `⏱ ออกก่อนเวลา ${fmtNum(earlyMin/60)} ชม. (หัก OT)`;
       if(entry.note) note = (note?note+' · ':'') + entry.note;
       // Append advance info if any on this day
       const isoDay = `${yy}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
